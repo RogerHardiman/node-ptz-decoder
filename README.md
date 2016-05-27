@@ -1,4 +1,4 @@
-# Pelco D Telemetry Decoder (node-pelcod_decoder)
+# Pelco D Telemetry Decoder (node-pelcod-decoder)
 
 This module reads Pelco D CCTV Camera Pan/Tilt/Zoom data, validates each command and decode its meaning.
 The descripion of each command is written to the console. The Pelco D commands decoded include
