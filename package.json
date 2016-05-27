@@ -1,0 +1,17 @@
+{
+  "name": "node-pelcod-decoder",
+  "version": "1.0.0",
+  "description": "Decode Pelco D telemetry decoder for CCTV cameras",
+  "license": "MIT",
+  "author": {
+    "name": "Roger Hardiman",
+    "email": "opensource@rjh.org.uk"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rogerhardiman/node-pelcod-decoder.git"
+  },
+  "dependencies": {
+    "serialport": "^3.1.2"
+  }
+}
