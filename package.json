@@ -1,5 +1,5 @@
 {
-  "name": "node-pelcod-decoder",
+  "name": "pelcod-decoder",
   "version": "1.0.0",
   "description": "Decode Pelco D telemetry decoder for CCTV cameras",
   "license": "MIT",
