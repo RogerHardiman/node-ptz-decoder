@@ -5,7 +5,7 @@
  * Copyright 2016 Roger Hardiman
  *
  *
- * Read the Buffer() onjects from the a stream and process Pelco D messages
+ * Read the Buffer() objects from the a stream and process Pelco D messages
  * Buffer() objects may have multiple Pelco messages or just part of a message
  * so bytes are cached if needed
  *
@@ -26,68 +26,48 @@
  *  | Command 2 | Focus Far | Zoom     | Zoom Tele | Down               | Up              | Left       | Right     | Always 0   |
  *  +-----------+-----------+----------+-----------+--------------------+-----------------+------------+-----------+------------+
  */
-// External Dependencies
-var SerialPort = require('serialport').SerialPort;
 
-// User Settings
-var SERIAL_PORT = 'COM2';
-var BAUD_RATE = 2400;
+function PelcoD_Decoder() {
 
-var port = new SerialPort(SERIAL_PORT, {
-    baudrate: BAUD_RATE,
-    parity: 'none',
-    dataBits: 8,
-    stopBits: 1,
-});
+    // A Buffer used to cache partial commands
+    this.pelco_command_buffer = new Buffer(7);
 
-// A buffer used to cache partial commands
-var pelco_command_buffer = new Buffer(7);
-var pelco_command_index = 0;
+    // Number of bytes in the current Buffer
+    this.pelco_command_index = 0;
+}
 
-// Open
-port.on('open', function(err) {
-    if (err) {
-        console.log('Serial Port Error : ' + err);
-    } else {
-        console.log('Serial Port ' + SERIAL_PORT + ' open');
-    }
-});
 
-// Data
-port.on('data', function(new_buffer) {
-    // process each byte from new_buffer in turn
+PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
+    // process each byte from new_data_buffer in turn
 
-    // console.log(bytes_to_string(new_buffer));
-
-    for (var i = 0; i < new_buffer.length; i++) {
+    for (var i = 0; i < new_data_buffer.length; i++) {
 
         // Get the next new byte
-        var new_byte = new_buffer[i];
+        var new_byte = new_data_buffer[i];
 
-        // Add the new_byte to the end of the pelco_command_buffer
-        if (pelco_command_index < pelco_command_buffer.length) {
-            // There is room to add the new_byte at the 'index' position
-            pelco_command_buffer[pelco_command_index] = new_byte;
-            pelco_command_index++;
+        if (this.pelco_command_index < this.pelco_command_buffer.length) {
+            // Add the new_byte to the end of the pelco_command_buffer
+            this.pelco_command_buffer[this.pelco_command_index] = new_byte;
+            this.pelco_command_index++;
         } else {
-            // shift the bytes to make room for the new_byte at the end
+            // Shift the bytes to make room for the new_byte at the end
             for (var x = 0; x < (pelco_command_buffer.length - 1); x++) {
-                pelco_command_buffer[x] = pelco_command_buffer[x + 1];
+                this.pelco_command_buffer[x] = this.pelco_command_buffer[x + 1];
             }
             // Then add the new_byte to the end
-            pelco_command_buffer[pelco_command_buffer.length-1] = new_byte;
+            this.pelco_command_buffer[this.pelco_command_buffer.length-1] = new_byte;
         }
 
         // Check if we have 7 bytes that begin 0xFF and that have a valid checksum
-        if (pelco_command_index === 7 && pelco_command_buffer[0] === 0xFF && checksum_valid(pelco_command_buffer) === true) {
+        if (this.pelco_command_index === 7 && this.pelco_command_buffer[0] === 0xFF && this.checksum_valid(this.pelco_command_buffer) === true) {
             // Looks like we have a Pelco command. Try and process it
-            process_buffer(pelco_command_buffer);
-            pelco_command_index = 0; // empty the buffer
+            this.decode(this.pelco_command_buffer);
+            this.pelco_command_index = 0; // empty the buffer
         }
     }
-});
+};
 
-function checksum_valid(buffer) {
+PelcoD_Decoder.prototype.checksum_valid = function(buffer) {
     var total = 0;
     for (var x = 0; x < (buffer.length - 1); x++) {
         total += buffer[x];
@@ -99,9 +79,10 @@ function checksum_valid(buffer) {
     } else {
         return false;
     }
-}
+};
 
-function process_buffer(pelco_command_buffer) {
+
+PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
     //var sync      = pelco_command_buffer[0];
     var camera_id = pelco_command_buffer[1];
     var command_1 = pelco_command_buffer[2];
@@ -128,7 +109,7 @@ function process_buffer(pelco_command_buffer) {
         } else if (command_1 === 0x00 && command_2 === 0x0B && data_1 === 0x00) {
             msg_string += '[CLEAR AUX ' + data_2 + ']';
         } else {
-            msg_string += 'Unknown extended command ' + bytes_to_string(pelco_command_buffer);
+            msg_string += 'Unknown extended command';
         }
 
     } else {
@@ -196,13 +177,23 @@ function process_buffer(pelco_command_buffer) {
         }
 
     }
-    console.log(msg_string);
-}
+    console.log(this.bytes_to_string(pelco_command_buffer) + ' ' + msg_string);
+};
 
-function bytes_to_string(buffer) {
+PelcoD_Decoder.prototype.bytes_to_string = function(buffer) {
     var byte_string = '';
     for (var i = 0; i < buffer.length; i++) {
-        byte_string += '[' + buffer[i].toString('16') + ']';
+        byte_string += '[' + this.DecToHexPad(buffer[i],2) + ']';
     }
     return byte_string;
-}
+};
+
+PelcoD_Decoder.prototype.DecToHexPad = function(decimal,size) {
+    var ret_string = decimal.toString('16');
+    while (ret_string.length < size) {
+        ret_string = '0' + ret_string;
+    }
+    return ret_string;
+};
+
+module.exports = PelcoD_Decoder;
