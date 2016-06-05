@@ -10,13 +10,20 @@
  * so bytes are cached if needed
  *
  */
-/*  +------------+---------+-----------+-----------+--------+--------+-----------+
- *  |   BYTE 1   | BYTE 2  |  BYTE 3   |  BYTE 4   | BYTE 5 | BYTE 6 |  BYTE 7   |
- *  +------------+---------+-----------+-----------+--------+--------+-----------+
- *  |            |         |           |           |        |        |           |
- *  | Synch Byte | Address | Command 1 | Command 2 | Data 1 | Data 2 | Check Sum |
- *  +------------+---------+-----------+-----------+--------+--------+-----------+
+/*
+ *  Commands are 7 bytes long, start with 0xFF and have a checksum
+ *  +-----------+---------+-----------+-----------+--------+--------+-----------+
+ *  |   BYTE 1  | BYTE 2  |  BYTE 3   |  BYTE 4   | BYTE 5 | BYTE 6 |  BYTE 7   |
+ *  +-----------+---------+-----------+-----------+--------+--------+-----------+
+ *  |           |         |           |           |        |        |           |
+ *  | Sync Byte | Address | Command 1 | Command 2 | Data 1 | Data 2 | Check Sum |
+ *  +-----------+---------+-----------+-----------+--------+--------+-----------+
  *
+ *  There are two types of command - Standard and Extended
+ *
+ *
+ * STANDARD COMMANDS
+ * Used to control Pan,Tilt,Zoom,Focus and Iris. Bytes 5 and 6 contain Pan and Tilt speeds
  *  +-----------+-----------+----------+-----------+--------------------+-----------------+------------+-----------+------------+
  *  |           |   BIT 7   |  BIT 6   |   BIT 5   |       BIT 4        |      BIT 3      |   BIT 2    |   BIT 1   |   BIT 0    |
  *  +-----------+-----------+----------+-----------+--------------------+-----------------+------------+-----------+------------+
@@ -25,6 +32,29 @@
  *  |           |           |          |           |                    |                 |            |           |            |
  *  | Command 2 | Focus Far | Zoom     | Zoom Tele | Down               | Up              | Left       | Right     | Always 0   |
  *  +-----------+-----------+----------+-----------+--------------------+-----------------+------------+-----------+------------+
+ *
+ * EXTENDED COMMANDS
+ * Bit 0 of Command 2 is set to '1' for extended commands (giving Command 2 an 'odd' numerical value)
+ * Byte 4 contains the extended command. Bytes 5 and 6 are used for data values. Byte 3 is used for additional settings
+ * There are a large number of extended commands. This code processes the common commands
+ *  +--------------------------------+--------+--------+---------------------+-------------+
+ *  |                                | BYTE 3 | BYTE 4 |       BYTE 5        |   BYTE 6    |
+ *  |                                | Cmd 1  | Cmd 2  |       Data 1        |   Data 2    |
+ *  +--------------------------------+--------+--------+---------------------+-------------+
+ *  |                                |        |        |                     |             |
+ *  | Set Preset                     | 00     | 03     | 00                  | value       |
+ *  |                                |        |        |                     |             |
+ *  | Clear Preset                   | 00     | 05     | 00                  | value       |
+ *  |                                |        |        |                     |             |
+ *  | Go To Preset                   | 00     | 07     | 00                  | value       |
+ *  |   Flip (180° about)            | 00     | 07     | 00                  | 21          |
+ *  |   Go To Zero Pan               | 00     | 07     | 00                  | 22          |
+ *  |                                |        |        |                     |             |
+ *  | Set Auxiliary                  | 00     | 09     | 00                  | value       |
+ *  |                                |        |        |                     |             |
+ *  | Clear Auxiliary                | 00     | 0B     | 00                  | value       |
+ *  |                                |        |        |                     |             |
+ *  +--------------------------------+--------+--------+---------------------+-------------+
  */
 
 function PelcoD_Decoder() {
@@ -100,18 +130,20 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
 
     var msg_string = 'Camera ' + camera_id + ' ';
 
-    if (command_1 === 0 && extended_bit === 1) {
+    if (extended_bit === 1) {
         // Process extended commands
+        // Command 2 (byte 4) identifies the Extended Command
+        // byte 3, 5 and 6 contain additional data used by the extended commands
 
-        if (command_1 === 0x00 && command_2 === 0x03 && data_1 === 0x00) {
+        if (command_2 === 0x03 && command_1 === 0x00 && data_1 === 0x00) {
             msg_string += '[SET PRESET ' + data_2 + ']';
-        } else if (command_1 === 0x00 && command_2 === 0x05 && data_1 === 0x00) {
+        } else if (command_2 === 0x05 && command_1 === 0x00 && data_1 === 0x00) {
             msg_string += '[CLEAR PRESET ' + data_2 + ']';
-        } else if (command_1 === 0x00 && command_2 === 0x07 && data_1 === 0x00) {
+        } else if (command_2 === 0x07 && command_1 === 0x00 && data_1 === 0x00) {
             msg_string += '[GOTO PRESET ' + data_2 + ']';
-        } else if (command_1 === 0x00 && command_2 === 0x09 && data_1 === 0x00) {
+        } else if (command_2 === 0x09 && command_1 === 0x00 && data_1 === 0x00) {
             msg_string += '[SET AUX ' + data_2 + ']';
-        } else if (command_1 === 0x00 && command_2 === 0x0B && data_1 === 0x00) {
+        } else if (command_2 === 0x0B && command_1 === 0x00 && data_1 === 0x00) {
             msg_string += '[CLEAR AUX ' + data_2 + ']';
         } else {
             msg_string += 'Unknown extended command';
