@@ -54,6 +54,12 @@
  *  |                                |        |        |                     |             |
  *  | Clear Auxiliary                | 00     | 0B     | 00                  | value       |
  *  |                                |        |        |                     |             |
+ *  | Set Pattern Start              | 00     | 1F     | 00                  | value       |
+ *  |                                |        |        |                     |             |
+ *  | Set Pattern Stop               | 00     | 21     | 00                  | value       |
+ *  |                                |        |        |                     |             |
+ *  | Run Pattern                    | 00     | 23     | 00                  | value       |
+ *  |                                |        |        |                     |             |
  *  +--------------------------------+--------+--------+---------------------+-------------+
  */
 
@@ -145,6 +151,12 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
             msg_string += '[SET AUX ' + data_2 + ']';
         } else if (command_2 === 0x0B && command_1 === 0x00 && data_1 === 0x00) {
             msg_string += '[CLEAR AUX ' + data_2 + ']';
+        } else if (command_2 === 0x1F && command_1 === 0x00 && data_1 === 0x00) {
+            msg_string += '[START RECORDING TOUR ' + data_2 + ']';
+        } else if (command_2 === 0x21 && command_1 === 0x00 && data_1 === 0x00) {
+            msg_string += '[STOP RECORDING TOUR]';
+        } else if (command_2 === 0x23 && command_1 === 0x00 && data_1 === 0x00) {
+            msg_string += '[START TOUR ' + data_2 + ']';
         } else {
             msg_string += 'Unknown extended command';
         }
