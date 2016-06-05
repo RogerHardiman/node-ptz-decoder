@@ -51,18 +51,23 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             this.pelco_command_index++;
         } else {
             // Shift the bytes to make room for the new_byte at the end
-            for (var x = 0; x < (pelco_command_buffer.length - 1); x++) {
+            for (var x = 0; x < (this.pelco_command_buffer.length - 1); x++) {
                 this.pelco_command_buffer[x] = this.pelco_command_buffer[x + 1];
             }
             // Then add the new_byte to the end
             this.pelco_command_buffer[this.pelco_command_buffer.length-1] = new_byte;
         }
 
-        // Check if we have 7 bytes that begin 0xFF and that have a valid checksum
-        if (this.pelco_command_index === 7 && this.pelco_command_buffer[0] === 0xFF && this.checksum_valid(this.pelco_command_buffer) === true) {
-            // Looks like we have a Pelco command. Try and process it
-            this.decode(this.pelco_command_buffer);
-            this.pelco_command_index = 0; // empty the buffer
+        // Check if we have 7 bytes that begin 0xFF
+        if (this.pelco_command_index === 7 && this.pelco_command_buffer[0] === 0xFF) {
+            // Check that the checksum is valud
+            if (this.checksum_valid(this.pelco_command_buffer) === true) {
+                // Looks like we have a Pelco command. Try and process it
+                this.decode(this.pelco_command_buffer);
+                this.pelco_command_index = 0; // empty the buffer
+            } else {
+                console.log(this.bytes_to_string(this.pelco_command_buffer) + ' Invalid Checksum');
+            }
         }
     }
 };
