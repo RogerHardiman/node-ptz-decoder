@@ -74,6 +74,9 @@ function PelcoD_Decoder() {
 
 
 PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
+
+    // console.log('received ' + this.bytes_to_string(new_data_buffer) );
+
     // process each byte from new_data_buffer in turn
 
     for (var i = 0; i < new_data_buffer.length; i++) {
@@ -110,10 +113,10 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
 
 PelcoD_Decoder.prototype.checksum_valid = function(buffer) {
     var total = 0;
-    for (var x = 0; x < (buffer.length - 1); x++) {
+    for (var x = 1; x < (buffer.length - 1); x++) {
         total += buffer[x];
     }
-    var computed_checksum = total % 255;
+    var computed_checksum = total % 256;
     // Check if computed_checksum matches the last byte in the buffer
     if (computed_checksum === buffer[buffer.length - 1]) {
         return true;
