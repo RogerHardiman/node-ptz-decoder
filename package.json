@@ -13,5 +13,14 @@
   },
   "dependencies": {
     "serialport": "^3.1.2"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "istanbul": "^0.4.3",
+    "mocha": "^2.5.3"
+  },
+  "scripts": {
+    "test": "./node_modules/.bin/mocha --reporter spec",
+    "coverage": "istanbul cover _mocha -- -R spec"
   }
 }
