@@ -146,8 +146,8 @@ describe("Pelco D Decoder", function() {
       pelcod_decoder.processBuffer(buf);
 
       // Set left and right, up and down, zoom in and zoom out, iris open and iris close, focus near and focus far ALL AT SAME TIME
-     var buf = new Buffer([0xFF,0x01,0xFF,0xFE,0x00,0x01,0x01]);
-  pelcod_decoder.processBuffer(buf);
+      var buf = new Buffer([0xFF,0x01,0xFF,0xFE,0x00,0x01,0xFF]);
+      pelcod_decoder.processBuffer(buf);
     });
   });
 
