@@ -47,7 +47,7 @@
  *  | Clear Preset                   | 00     | 05     | 00                  | value       |
  *  |                                |        |        |                     |             |
  *  | Go To Preset                   | 00     | 07     | 00                  | value       |
- *  |   Flip (180° about)            | 00     | 07     | 00                  | 21          |
+ *  |   Flip (180deg about)          | 00     | 07     | 00                  | 21          |
  *  |   Go To Zero Pan               | 00     | 07     | 00                  | 22          |
  *  |                                |        |        |                     |             |
  *  | Set Auxiliary                  | 00     | 09     | 00                  | value       |
@@ -181,7 +181,7 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
             msg_string += '[PAN LEFT ('+data_1+')]';
         } else if (left === 0 && right === 1) {
             msg_string += '[PAN RIGHT('+data_1+')]';
-        } else if (left === 1 && right === 1) {
+        } else { // left === 1 && right === 1)
             msg_string += '[PAN ???? ('+data_1+')]';
         }
 
@@ -191,7 +191,7 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
             msg_string += '[TILT UP  ('+data_2+')]';
         } else if (up === 0 && down === 1) {
             msg_string += '[TILT DOWN('+data_2+')]';
-        } else if (up === 1 && down === 1) {
+        } else { // (up === 1 && down === 1)
             msg_string += '[TILT ????('+data_2+')]';
         }
 
@@ -201,7 +201,7 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
             msg_string += '[ZOOM IN  ]';
         } else if (zoom_in === 0 && zoom_out === 1) {
             msg_string += '[ZOOM OUT ]';
-        } else if (zoom_in === 1 && zoom_out === 1) {
+        } else { // (zoom_in === 1 && zoom_out === 1)
             msg_string += '[ZOOM ????]';
         }
 
@@ -211,7 +211,7 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
             msg_string += '[IRIS OPEN ]';
         } else if (iris_open === 0 && iris_close === 1) {
             msg_string += '[IRIS CLOSE]';
-        } else if (iris_open === 1 && iris_close === 1) {
+        } else { // (iris_open === 1 && iris_close === 1)
             msg_string += '[IRIS ???? ]';
         }
 
@@ -221,7 +221,7 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
             msg_string += '[FOCUS NEAR]';
         } else if (focus_near === 0 && focus_far === 1) {
             msg_string += '[FOCUS FAR ]';
-        } else if (focus_near === 1 && focus_far === 1) {
+        } else { // (focus_near === 1 && focus_far === 1)
             msg_string += '[FOCUS ????]';
         }
 
