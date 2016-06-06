@@ -153,7 +153,7 @@ describe("Pelco D Decoder", function() {
 
 
   describe("Test byte cache with split bytes (Pan Left)", function() {
-    it("tests byte cache", function() {
+    it("tests split command", function() {
       var pelcod_decoder = new PelcoD_Decoder();
       var bytes1 = [0xFF,0x01,0x00,0x04];
       var bytes2 = [0x20,0x00,0x25];
@@ -165,9 +165,18 @@ describe("Pelco D Decoder", function() {
   });
 
   describe("Test byte cache with Pan Left and Stop", function() {
-    it("tests byte cache", function() {
+    it("tests multiple commands", function() {
       var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0xFF,0x01,0x00,0x04,0x20,0x00,0x25,0xFF,0x01,0x00,0x00,0x00,0x00,0x01];
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
+
+  describe("Test byte cache with garbage then real command (stop)", function() {
+    it("tests garbage then data", function() {
+      var pelcod_decoder = new PelcoD_Decoder();
+      var bytes = [0x01,0x02,0x03,0xFF,0x01,0x00,0x00,0x00,0x00,0x01];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
     });
