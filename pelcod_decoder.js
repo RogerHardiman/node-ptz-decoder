@@ -99,7 +99,7 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
 
         // Check if we have 7 bytes that begin 0xFF
         if (this.pelco_command_index === 7 && this.pelco_command_buffer[0] === 0xFF) {
-            // Check that the checksum is valud
+            // Check that the checksum is valid
             if (this.checksum_valid(this.pelco_command_buffer) === true) {
                 // Looks like we have a Pelco command. Try and process it
                 this.decode(this.pelco_command_buffer);
@@ -113,6 +113,7 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
 
 PelcoD_Decoder.prototype.checksum_valid = function(buffer) {
     var total = 0;
+    // The 0xFF start byte is not included in the checksum
     for (var x = 1; x < (buffer.length - 1); x++) {
         total += buffer[x];
     }
@@ -160,6 +161,8 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
             msg_string += '[STOP RECORDING TOUR]';
         } else if (command_2 === 0x23 && command_1 === 0x00 && data_1 === 0x00) {
             msg_string += '[START TOUR ' + data_2 + ']';
+        } else if (command_2 === 0x25 && command_1 === 0x00 && data_1 === 0x00) {
+            msg_string += '[SET ZOOM SPEED ' + data_2 + ']';
         } else {
             msg_string += 'Unknown extended command';
         }
