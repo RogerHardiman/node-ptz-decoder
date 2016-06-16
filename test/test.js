@@ -143,8 +143,8 @@ describe("Pelco D Decoder", function() {
 
       // Set Zoom Speed
       var buf = new Buffer([0xFF,0x01,0x00,0x25,0x00,0x03,0x29]);
-
       pelcod_decoder.processBuffer(buf);
+
       // Unknown extended command (with valid checksum)
       var buf = new Buffer([0xFF,0x01,0x00,0x01,0x00,0x01,0x03]);
       pelcod_decoder.processBuffer(buf);
