@@ -1,6 +1,6 @@
 /*
  *
- * Read and decode Pelco D CCTV commands
+ * Read and decode Pelco D and Pelco P CCTV commands
  * Used to monitor the output from Pelco systems or the inputs into Pelco cameras
  * Copyright 2016 Roger Hardiman
  *
@@ -11,27 +11,60 @@
  *
  */
 /*
- *  Commands are 7 bytes long, start with 0xFF and have a checksum
+ *  SOURCE MATERIAL
+ *  Pelco D data sheet (official Pelco document - 1999 Edition)
+ *  NuOptic D Protocol http://www.nuoptic.com/wp-content/uploads/files/NuOptic_VIS-1000_D-Protocol_Reference.pdf
+ *  CommFront 232 Analizer https://www.commfront.com/pages/pelco-d-protocol-tutorial
+ *  CommFront 232 Analizer https://www.commfront.com/pages/pelco-p-protocol-tutorial
+ *  CodeProject Pelco D and Pelco P pages http://www.codeproject.com/Articles/8034/Pelco-P-and-D-protocol-implementation-in-C
+ * 
+ *  Pelco D Commands are 7 bytes long, start with 0xFF and have a 'sum' checksum
+ *  Checksum is Sum of bytes 2 to 6 Modulo 256
+ *  Camera 1 has Address 01
  *  +-----------+---------+-----------+-----------+--------+--------+-----------+
  *  |   BYTE 1  | BYTE 2  |  BYTE 3   |  BYTE 4   | BYTE 5 | BYTE 6 |  BYTE 7   |
  *  +-----------+---------+-----------+-----------+--------+--------+-----------+
  *  |           |         |           |           |        |        |           |
- *  | Sync Byte | Address | Command 1 | Command 2 | Data 1 | Data 2 | Check Sum |
+ *  | Sync(0xFF)| Address | Command 1 | Command 2 | Data 1 | Data 2 | Check Sum |
  *  +-----------+---------+-----------+-----------+--------+--------+-----------+
+ *
+ *  Pelco P Commands are 8 bytes long, include STX and ETX and have a 'XOR' checksum
+ *  Checksum is XOR of bytes 1 to 7
+ *  Camera 1 has Address 00
+ *  +-----------+---------+-----------+-----------+--------+--------+-----------+-----------+
+ *  |   BYTE 1  | BYTE 2  |  BYTE 3   |  BYTE 4   | BYTE 5 | BYTE 6 |   BYTE 7  |  BYTE 8   |
+ *  +-----------+---------+-----------+-----------+--------+--------+-----------+-----------+
+ *  |           |         |           |           |        |        |           |           |
+ *  | STX(0xA0) | Address | Command 1 | Command 2 | Data 1 | Data 2 | ETX(0xAF) | Check Sum |
+ *  +-----------+---------+-----------+-----------+--------+--------+-----------+-----------+
  *
  *  There are two types of command - Standard and Extended
  *
  *
  * STANDARD COMMANDS
+ * Pelco D Format
  * Used to control Pan,Tilt,Zoom,Focus and Iris. Bytes 5 and 6 contain Pan and Tilt speeds
- *  +-----------+-----------+----------+-----------+--------------------+-----------------+------------+-----------+------------+
- *  |           |   BIT 7   |  BIT 6   |   BIT 5   |       BIT 4        |      BIT 3      |   BIT 2    |   BIT 1   |   BIT 0    |
- *  +-----------+-----------+----------+-----------+--------------------+-----------------+------------+-----------+------------+
- *  |           |           |          |           |                    |                 |            |           |            |
- *  | Command 1 | Sense     | Reserved | Reserved  | Auto / Manual Scan | Camera On / Off | Iris Close | Iris Open | Focus Near |
- *  |           |           |          |           |                    |                 |            |           |            |
- *  | Command 2 | Focus Far | Zoom     | Zoom Tele | Down               | Up              | Left       | Right     | Always 0   |
- *  +-----------+-----------+----------+-----------+--------------------+-----------------+------------+-----------+------------+
+ *  +---------+---------+--------+---------+------------------+---------------+----------+---------+----------+
+ *  |         |  BIT 7  | BIT 6  |  BIT 5  |      BIT 4       |     BIT 3     |  BIT 2   |  BIT 1  |  BIT 0   |
+ *  +---------+---------+--------+---------+------------------+---------------+----------+---------+----------+
+ *  |         |         |        |         |                  |               |          |         |          |
+ *  |Command 1|Sense    |Reserved|Reserved |Auto / Manual Scan|Camera On / Off|Iris Close|Iris Open|Focus Near|
+ *  |         |         |        |         |                  |               |          |         |          |
+ *  |Command 2|Focus Far|Zoom    |Zoom Tele|Down              |Up             |Left      |Right    |Always 0  |
+ *  +---------+---------+--------+---------+------------------+---------------+----------+---------+----------+
+ *
+ * Pelco P Format
+ * Used to control Pan,Tilt,Zoom,Focus and Iris. Bytes 5 and 6 contain Pan and Tilt speeds
+ *  +---------+--------+-------------+---------------+-------------+----------+---------+---------+----------+
+ *  |         |  BIT 7 |    BIT 6    |     BIT 5     |   BIT 4     |  BIT 3   |  BIT 2  |  BIT 1  |  BIT 0   |
+ *  +---------+--------+-------------+---------------+-------------+----------+---------+---------+----------+
+ *  |         |        |             |               |             |          |         |         |          |
+ *  |Command 1|Always 0|Camera On/Off|Autoscan On/Off|Camera On/Off|Iris Close|Iris Open|Focus Near|Focus Far|
+ *  |         |        |             |               |             |          |         |         |          |
+ *  |Command 2|Always 0|Zoom Wide    |Zoom Tele      |Tilt Down    |Tilt Up   |Pan Left |Pan Right|Always 0  |
+ *  +---------+--------+-------------+---------------+-------------+----------+---------+---------+----------+
+ * The Pelco P table comes from various web sites and not from any formal documents
+ *
  *
  * EXTENDED COMMANDS
  * Bit 0 of Command 2 is set to '1' for extended commands (giving Command 2 an 'odd' numerical value)
@@ -70,6 +103,12 @@ function PelcoD_Decoder() {
 
     // Number of bytes in the current Buffer
     this.pelco_command_index = 0;
+
+    // A Buffer used to cache partial commands for Pelco P
+    this.pelco_p_command_buffer = new Buffer(8);
+
+    // Number of bytes in the current Buffer
+    this.pelco_p_command_index = 0;
 }
 
 
@@ -84,6 +123,7 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
         // Get the next new byte
         var new_byte = new_data_buffer[i];
 
+        // Add to Pelco D buffer
         if (this.pelco_command_index < this.pelco_command_buffer.length) {
             // Add the new_byte to the end of the pelco_command_buffer
             this.pelco_command_buffer[this.pelco_command_index] = new_byte;
@@ -97,16 +137,36 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             this.pelco_command_buffer[this.pelco_command_buffer.length-1] = new_byte;
         }
 
-        // Check if we have 7 bytes that begin 0xFF
-        if (this.pelco_command_index === 7 && this.pelco_command_buffer[0] === 0xFF) {
-            // Check that the checksum is valid
-            if (this.checksum_valid(this.pelco_command_buffer) === true) {
-                // Looks like we have a Pelco command. Try and process it
-                this.decode(this.pelco_command_buffer);
-                this.pelco_command_index = 0; // empty the buffer
-            } else {
-                console.log(this.bytes_to_string(this.pelco_command_buffer) + ' Invalid Checksum');
+        // Add to Pelco P buffer
+        if (this.pelco_p_command_index < this.pelco_p_command_buffer.length) {
+            // Add the new_byte to the end of the pelco_p_command_buffer
+            this.pelco_p_command_buffer[this.pelco_p_command_index] = new_byte;
+            this.pelco_p_command_index++;
+        } else {
+            // Shift the bytes to make room for the new_byte at the end
+            for (var x = 0; x < (this.pelco_p_command_buffer.length - 1); x++) {
+                this.pelco_p_command_buffer[x] = this.pelco_p_command_buffer[x + 1];
             }
+            // Then add the new_byte to the end
+            this.pelco_p_command_buffer[this.pelco_p_command_buffer.length-1] = new_byte;
+        }
+
+
+        // Pelco D Test. Check if we have 7 bytes with byte 0 = 0xFF and with a valid SUM checksum
+        if (this.pelco_command_index === 7 && this.pelco_command_buffer[0] === 0xFF
+                                           && this.checksum_valid(this.pelco_command_buffer)) {
+            // Looks like we have a Pelco command. Try and process it
+            this.decode(this.pelco_command_buffer);
+            this.pelco_command_index = 0; // empty the buffer
+        }
+
+        // Pelco P Test. Check if we have 8 bytes with byte 0 = 0xA0, byte 6 = 0xAF and with a valid XOR checksum
+        if (this.pelco_p_command_index === 8 && this.pelco_p_command_buffer[0] === 0xA0
+                                             && this.pelco_p_command_buffer[6] === 0xAF
+                                             && this.checksum_p_valid(this.pelco_p_command_buffer)) {
+            // Looks like we have a Pelco command. Try and process it
+            this.decode(this.pelco_p_command_buffer);
+            this.pelco_p_command_index = 0; // empty the buffer
         }
     }
 };
@@ -126,21 +186,57 @@ PelcoD_Decoder.prototype.checksum_valid = function(buffer) {
     }
 };
 
+PelcoD_Decoder.prototype.checksum_p_valid = function(buffer) {
+    var computed_checksum = 0x00;
+    for (var x = 0; x < (buffer.length - 1); x++) {
+        computed_checksum = computed_checksum ^ buffer[x]; // xor
+    }
+    // Check if computed_checksum matches the last byte in the buffer
+    if (computed_checksum === buffer[buffer.length - 1]) {
+        return true;
+    } else {
+        return false;
+    }
+};
+
 
 PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
-    //var sync      = pelco_command_buffer[0];
-    var camera_id = pelco_command_buffer[1];
-    var command_1 = pelco_command_buffer[2];
-    var command_2 = pelco_command_buffer[3];
-    var data_1 = pelco_command_buffer[4];
-    var data_2 = pelco_command_buffer[5];
-    //var checksum  = pelco_command_buffer[6];
 
-    var extended_bit = command_2 & 0x01;
+    var pelco_d = false;
+    var pelco_p = false;
+
+    if (pelco_command_buffer.length == 7) pelco_d = true;
+    if (pelco_command_buffer.length == 8) pelco_p = true;
+
+    if (pelco_d) {
+        //var sync      = pelco_command_buffer[0];
+        var camera_id = pelco_command_buffer[1];
+        var command_1 = pelco_command_buffer[2];
+        var command_2 = pelco_command_buffer[3];
+        var data_1 = pelco_command_buffer[4];
+        var data_2 = pelco_command_buffer[5];
+        //var checksum  = pelco_command_buffer[6];
+
+        var extended_command = ((command_2 & 0x01)==1);
+    }
+    if (pelco_p) {
+        //var sync      = pelco_command_buffer[0];
+        var camera_id = pelco_command_buffer[1];
+        var command_1 = pelco_command_buffer[2];
+        var command_2 = pelco_command_buffer[3];
+        var data_1 = pelco_command_buffer[4];
+        var data_2 = pelco_command_buffer[5];
+        //var sync2  = pelco_command_buffer[6];
+        //var checksum  = pelco_command_buffer[7];
+
+        var extended_command = ((command_2 & 0x01)==1);
+    }
+
+
 
     var msg_string = 'Camera ' + camera_id + ' ';
 
-    if (extended_bit === 1) {
+    if (pelco_d && extended_command) {
         // Process extended commands
         // Command 2 (byte 4) identifies the Extended Command
         // byte 3, 5 and 6 contain additional data used by the extended commands
@@ -166,20 +262,37 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
         } else {
             msg_string += 'Unknown extended command';
         }
-
-    } else {
+    }
+    else if (pelco_p && extended_command) {
+            msg_string += 'Unknown extended command';
+        }
+    else {
         // Process a normal Pan, Tilt, Zoom, Focus and Iris command
 
-        var iris_close = (command_1 >> 2) & 0x01;
-        var iris_open = (command_1 >> 1) & 0x01;
-        var focus_near = (command_1) & 0x01;
-        var focus_far = (command_2 >> 7) & 0x01;
-        var zoom_out = (command_2 >> 6) & 0x01;
-        var zoom_in = (command_2 >> 5) & 0x01;
-        var down = (command_2 >> 4) & 0x01;
-        var up = (command_2 >> 3) & 0x01;
-        var left = (command_2 >> 2) & 0x01;
-        var right = (command_2 >> 1) & 0x01;
+        if (pelco_d) {
+            var iris_close = (command_1 >> 2) & 0x01;
+            var iris_open = (command_1 >> 1) & 0x01;
+            var focus_near = (command_1 >> 0) & 0x01;
+            var focus_far = (command_2 >> 7) & 0x01;
+            var zoom_out = (command_2 >> 6) & 0x01;
+            var zoom_in = (command_2 >> 5) & 0x01;
+            var down = (command_2 >> 4) & 0x01;
+            var up = (command_2 >> 3) & 0x01;
+            var left = (command_2 >> 2) & 0x01;
+            var right = (command_2 >> 1) & 0x01;
+        }
+        if (pelco_p) {
+            var iris_close = (command_1 >> 3) & 0x01;
+            var iris_open = (command_1 >> 2) & 0x01;
+            var focus_near = (command_1 >> 1) & 0x01;
+            var focus_far = (command_1 >> 0) & 0x01;
+            var zoom_out = (command_2 >> 6) & 0x01;
+            var zoom_in = (command_2 >> 5) & 0x01;
+            var down = (command_2 >> 4) & 0x01;
+            var up = (command_2 >> 3) & 0x01;
+            var left = (command_2 >> 2) & 0x01;
+            var right = (command_2 >> 1) & 0x01;
+        }
 
         if (left === 0 && right === 0) {
             msg_string += '[pan stop     ]';

@@ -186,5 +186,49 @@ describe("Pelco D Decoder", function() {
     });
   });
 
-});
+  describe("Pelco P Test Pan Left", function() {
+    it("tests Pan Left", function() {
+      var pelcod_decoder = new PelcoD_Decoder();
+      var bytes = [0xA0,0x00,0x00,0x04,0x20,0x00,0xAF,0x2B];
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
 
+  describe("Pelco P Test Pan Right", function() {
+    it("tests Pan Right", function() {
+      var pelcod_decoder = new PelcoD_Decoder();
+      var bytes = [0xA0,0x00,0x00,0x02,0x20,0x00,0xAF,0x2D];
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
+
+  describe("Pelco P Test Tilt Up", function() {
+    it("tests Tilt Up", function() {
+      var pelcod_decoder = new PelcoD_Decoder();
+      var bytes = [0xA0,0x00,0x00,0x08,0x00,0x20,0xAF,0x27];
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
+
+  describe("Pelco P Test Tilt Down", function() {
+    it("tests Tilt Down", function() {
+      var pelcod_decoder = new PelcoD_Decoder();
+      var bytes = [0xA0,0x00,0x00,0x10,0x00,0x20,0xAF,0x3F];
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
+
+  describe("Pelco P Test Stop", function() {
+    it("tests Stop", function() {
+      var pelcod_decoder = new PelcoD_Decoder();
+      var bytes = [0xA0,0x00,0x00,0x00,0x00,0x00,0xAF,0x0F];
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
+
+});
