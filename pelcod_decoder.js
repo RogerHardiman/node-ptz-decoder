@@ -70,30 +70,33 @@
  * Bit 0 of Command 2 is set to '1' for extended commands (giving Command 2 an 'odd' numerical value)
  * Byte 4 contains the extended command. Bytes 5 and 6 are used for data values. Byte 3 is used for additional settings
  * There are a large number of extended commands. This code processes the common commands
- *  +--------------------------------+--------+--------+---------------------+-------------+
- *  |                                | BYTE 3 | BYTE 4 |       BYTE 5        |   BYTE 6    |
- *  |                                | Cmd 1  | Cmd 2  |       Data 1        |   Data 2    |
- *  +--------------------------------+--------+--------+---------------------+-------------+
- *  |                                |        |        |                     |             |
- *  | Set Preset                     | 00     | 03     | 00                  | value       |
- *  |                                |        |        |                     |             |
- *  | Clear Preset                   | 00     | 05     | 00                  | value       |
- *  |                                |        |        |                     |             |
- *  | Go To Preset                   | 00     | 07     | 00                  | value       |
- *  |   Flip (180deg about)          | 00     | 07     | 00                  | 21          |
- *  |   Go To Zero Pan               | 00     | 07     | 00                  | 22          |
- *  |                                |        |        |                     |             |
- *  | Set Auxiliary                  | 00     | 09     | 00                  | value       |
- *  |                                |        |        |                     |             |
- *  | Clear Auxiliary                | 00     | 0B     | 00                  | value       |
- *  |                                |        |        |                     |             |
- *  | Set Pattern Start              | 00     | 1F     | 00                  | value       |
- *  |                                |        |        |                     |             |
- *  | Set Pattern Stop               | 00     | 21     | 00                  | value       |
- *  |                                |        |        |                     |             |
- *  | Run Pattern                    | 00     | 23     | 00                  | value       |
- *  |                                |        |        |                     |             |
- *  +--------------------------------+--------+--------+---------------------+-------------+
+ *  +--------------------------------+--------+--------+---------------------+-------------+----+
+ *  |                                | BYTE 3 | BYTE 4 |       BYTE 5        |   BYTE 6    |D/P |
+ *  |                                | Cmd 1  | Cmd 2  |       Data 1        |   Data 2    |    |
+ *  +--------------------------------+--------+--------+---------------------+-------------+----+
+ *  |                                |        |        |                     |             |    |
+ *  | Set Preset                     | 00     | 03     | 00                  | value       |Both|
+ *  |                                |        |        |                     |             |    |
+ *  | Clear Preset                   | 00     | 05     | 00                  | value       |Both|
+ *  |                                |        |        |                     |             |    |
+ *  | Go To Preset                   | 00     | 07     | 00                  | value       |Both|
+ *  |   Flip (180deg about)          | 00     | 07     | 00                  | 21          |    |
+ *  |   Go To Zero Pan               | 00     | 07     | 00                  | 22          |    |
+ *  |                                |        |        |                     |             |    |
+ *  | Set Auxiliary                  | 00     | 09     | 00                  | value       |D   |
+ *  |                                |        |        |                     |             |    |
+ *  | Clear Auxiliary                | 00     | 0B     | 00                  | value       |D   |
+ *  |                                |        |        |                     |             |    |
+ *  | Set Pattern Start              | 00     | 1F     | 00                  | value       |Both|
+ *  |                                |        |        |                     |             |    |
+ *  | Set Pattern Stop               | 00     | 21     | 00                  | value       |Both|
+ *  |                                |        |        |                     |             |    |
+ *  | Run Pattern                    | 00     | 23     | 00                  | value       |Both|
+ *  |                                |        |        |                     |             |    |
+ *  | Set Zoom Speed                 | 00     | 25     | 00                  | value (0-3) |Both|
+ *  |                                |        |        |                     |             |    |
+ *  +--------------------------------+--------+--------+---------------------+-------------+----+
+ *
  */
 
 function PelcoD_Decoder() {
@@ -204,6 +207,7 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
 
     var pelco_d = false;
     var pelco_p = false;
+    var msg_string ='';
 
     if (pelco_command_buffer.length == 7) pelco_d = true;
     if (pelco_command_buffer.length == 8) pelco_p = true;
@@ -218,6 +222,7 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
         //var checksum  = pelco_command_buffer[6];
 
         var extended_command = ((command_2 & 0x01)==1);
+        msg_string += 'D ';
     }
     if (pelco_p) {
         //var sync      = pelco_command_buffer[0];
@@ -230,16 +235,18 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
         //var checksum  = pelco_command_buffer[7];
 
         var extended_command = ((command_2 & 0x01)==1);
+        msg_string += 'P ';
     }
 
 
+	
+    msg_string += 'Camera ' + camera_id + ' ';
+    
 
-    var msg_string = 'Camera ' + camera_id + ' ';
-
-    if (pelco_d && extended_command) {
+    if (extended_command) {
         // Process extended commands
-        // Command 2 (byte 4) identifies the Extended Command
-        // byte 3, 5 and 6 contain additional data used by the extended commands
+        // Command 1 (byte3) and Command 2 (byte 4) identifies the Extended Command
+        // byte 5 and 6 contain additional data used by the extended commands
 
         if (command_2 === 0x03 && command_1 === 0x00 && data_1 === 0x00) {
             msg_string += '[SET PRESET ' + data_2 + ']';
@@ -262,11 +269,7 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
         } else {
             msg_string += 'Unknown extended command';
         }
-    }
-    else if (pelco_p && extended_command) {
-            msg_string += 'Unknown extended command';
-        }
-    else {
+    } else {
         // Process a normal Pan, Tilt, Zoom, Focus and Iris command
 
         if (pelco_d) {
