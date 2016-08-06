@@ -14,11 +14,11 @@
  */
 
 // External Dependencies
-var SerialPort = require('serialport').SerialPort;
+var SerialPort = require('serialport');
 var PelcoD_Decoder = require('./pelcod_decoder');
 
 // User Settings
-var SERIAL_PORT = '/dev/ttyUSB0';
+var SERIAL_PORT = 'COM1';
 var BAUD_RATE = 2400;
 
 // Globals
