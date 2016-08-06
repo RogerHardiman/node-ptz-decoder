@@ -231,4 +231,13 @@ describe("Pelco D Decoder", function() {
     });
   });
 
+  describe("Pelco P bad checksum", function() {
+    it("tests bad checksum", function() {
+      var pelcod_decoder = new PelcoD_Decoder();
+      var bytes = [0xA0,0x00,0x00,0x00,0xFF,0x00,0xAF,0x0F];
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
+
 });
