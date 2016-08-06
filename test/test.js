@@ -177,10 +177,19 @@ describe("Pelco D Decoder", function() {
     });
   });
 
-  describe("Test byte cache with garbage then real command (stop)", function() {
+  describe("Test byte cache with small amount of garbage then real command (stop)", function() {
     it("tests garbage then data", function() {
       var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0x01,0x02,0x03,0xFF,0x01,0x00,0x00,0x00,0x00,0x01];
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
+
+  describe("Test byte cache with large amount of garbage then real command (stop)", function() {
+    it("tests garbage then data", function() {
+      var pelcod_decoder = new PelcoD_Decoder();
+      var bytes = [0x10,0x20,0x30,0x40,0x50,0x60,0x70,0x80,0x90,0xFF,0x01,0x00,0x00,0x00,0x00,0x01];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
     });
@@ -239,5 +248,25 @@ describe("Pelco D Decoder", function() {
       pelcod_decoder.processBuffer(buf);
     });
   });
+
+  describe("Pelco P Test byte cache with small amount of garbage then real command (stop)", function() {
+    it("tests garbage then data", function() {
+      var pelcod_decoder = new PelcoD_Decoder();
+      var bytes = [0x01,0x02,0x03,0xA0,0x00,0x00,0x00,0x00,0x00,0xAF,0x0F];
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
+
+  describe("Pelco P Test byte cache with large amount of garbage then real command (stop)", function() {
+    it("tests garbage then data", function() {
+      var pelcod_decoder = new PelcoD_Decoder();
+      var bytes = [0x10,0x20,0x30,0x40,0x50,0x60,0x70,0x80,0x90,0xA0,0x00,0x00,0x00,0x00,0x00,0xAF,0x0F];
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
+
+
 
 });
