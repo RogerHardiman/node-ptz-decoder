@@ -1,7 +1,7 @@
 {
   "name": "pelcod-decoder",
-  "version": "1.0.0",
-  "description": "Decode Pelco D telemetry decoder for CCTV cameras",
+  "version": "2.0.0",
+  "description": "Pelco D and Pelco P telemetry decoder for CCTV cameras",
   "license": "MIT",
   "author": {
     "name": "Roger Hardiman",
