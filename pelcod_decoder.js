@@ -171,7 +171,6 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
 
         // Add to Bosch 8 byte buffer
 	if (new_byte & 0x80) {
-console.log('BOSCH HEADER');
 	    // MSB set to 1. This marks the start of a Bosch command so reset buffer counter
 	    this.bosch_command_index = 0;
 	}
@@ -418,13 +417,15 @@ PelcoD_Decoder.prototype.decode_bosch = function(bosch_command_buffer) {
     //var data_byte_2 = bosch_command_buffer[5];
     //var data_byte_3 = bosch_command_buffer[6];
     //var data_byte_X = bosch_command_buffer[xxx];
-    //var checksum = bosch_command_buffer[the last byte]
+    //var checksum = bosch_command_buffer[the last byte];
 
     var camera_id = (high_order_address << 7) + low_order_address + 1;
 
     msg_string += 'Camera ' + camera_id + ' ';
     
-    // Process Op Code
+    //
+    // OSRD Commands
+    //
     if (op_code == 0x02) {
         msg_string += 'Start/Stop Fixed Speed PTZ, Focus and Iris';
     }
@@ -514,7 +515,7 @@ PelcoD_Decoder.prototype.decode_bosch = function(bosch_command_buffer) {
         var data_1 = bosch_command_buffer[4];
         var data_2 = bosch_command_buffer[5];
         var function_code = data_1 & 0x0F;
-        var data = (data_1 >> 4) + data_2;
+        var data = ((data_1 & 0x70)<< 3) + data_2;
         if (function_code == 1) msg_string += 'Aux On ' + data;
         else if (function_code == 2) msg_string += 'Aux Off ' + data;
         else if (function_code == 4) msg_string += 'Pre-position SET ' + data;
@@ -527,6 +528,10 @@ PelcoD_Decoder.prototype.decode_bosch = function(bosch_command_buffer) {
     else if (op_code == 0x08) {
         msg_string += 'Repetitive Variable-speed PTZ, Focus and Iris';
     }
+
+    //
+    // OSRD Extended Commands
+    //
     else if (op_code == 0x09) {
         msg_string += 'Fine Speed PTZ';
     }
@@ -551,6 +556,10 @@ PelcoD_Decoder.prototype.decode_bosch = function(bosch_command_buffer) {
     else if (op_code == 0x14) {
         msg_string += 'BiCom message';
     }
+
+    //
+    // BiCom within OSRD
+    //
     else {
         msg_string += 'Unknown Op Code ' + op_code;
     }
