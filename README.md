@@ -32,6 +32,21 @@ The Forward Vision commands decoded include
   * Set Zoom Speed
 
 
+# Command Line Test Program
+The command line test program is executed as
+```
+node read_serial_port.js
+```
+This opens a serial port, waits for bytes and then decodes their meaning.
+The following flags customise the usage
+ * -h    help
+ * -l    list available serial port
+ * -V    version
+ * --baud value
+ * --parity value (values are none,even,odd)
+
+
+
 # Baud Rates
 Pelco D telemery is always 7 bytes long and always starts with 0xFF and ends with a checksum. On a Pelco KBD300A Pelco D runs at 2400 baud 8-N-1 with 4800 and 9600 also common on other installations.
 
