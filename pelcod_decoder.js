@@ -1,12 +1,12 @@
 /*
  *
- * Read and decode Pelco D and Pelco P CCTV commands
+ * Read and decode Pelco D, Pelco P, BBV422 and Bosch/Philips CCTV commands
  * Used to monitor the output from Pelco systems or the inputs into Pelco cameras
- * Copyright 2016 Roger Hardiman
+ * (c) Copyright 2016 Roger Hardiman
  *
  *
- * Read the Buffer() objects from the a stream and process Pelco D messages
- * Buffer() objects may have multiple Pelco messages or just part of a message
+ * Read the Buffer() objects from the a stream and process Pelco D, Pelco P, BBV422 and Bosch/Philips messages
+ * Buffer() objects may have multiple PTZ messages or just part of a message
  * so bytes are cached if needed
  *
  */
@@ -22,6 +22,10 @@
  *  Node-Pelco Source Code https://github.com/Scoup/node-pelcod
  *  CommFront 232 Analizer https://www.commfront.com/pages/pelco-d-protocol-tutorial
  *  CommFront 232 Analizer https://www.commfront.com/pages/pelco-p-protocol-tutorial
+ *
+ *  BBV Web Site for BBV422 Telemetry Format
+ *
+ *  Bosch Web Site for Bosch OSRD protocol format
  * 
  *  Pelco D Commands are 7 bytes long, start with 0xFF and have a 'sum' checksum
  *  Checksum is Sum of bytes 2 to 6 Modulo 256
@@ -33,14 +37,15 @@
  *  | Sync(0xFF)| Address | Command 1 | Command 2 | Data 1 | Data 2 | Check Sum |
  *  +-----------+---------+-----------+-----------+--------+--------+-----------+
  *
- *  Pelco P Commands are 8 bytes long, include STX and ETX and have a 'XOR' checksum
+ *  Pelco P Commands (and BBV422) are 8 bytes long, include STX and ETX and have a 'XOR' checksum
  *  Checksum is XOR of bytes 1 to 7
  *  Camera 1 has Address 00
  *  +-----------+---------+-----------+-----------+--------+--------+-----------+-----------+
  *  |   BYTE 1  | BYTE 2  |  BYTE 3   |  BYTE 4   | BYTE 5 | BYTE 6 |   BYTE 7  |  BYTE 8   |
  *  +-----------+---------+-----------+-----------+--------+--------+-----------+-----------+
  *  |           |         |           |           |        |        |           |           |
- *  | STX(0xA0) | Address | Command 1 | Command 2 | Data 1 | Data 2 | ETX(0xAF) | Check Sum |
+ *  | STX(0xA0) | Address | Command 1 | Command 2 | Data 1 | Data 2 | ETX(0xAF) | Check Sum | Pelco P
+ *  | STX(0xB0) | Address | Command 1 | Command 2 | Data 1 | Data 2 | ETX(0xBF) | Check Sum | BBV422
  *  +-----------+---------+-----------+-----------+--------+--------+-----------+-----------+
  *
  *  There are two types of command - Standard and Extended
@@ -58,7 +63,7 @@
  *  |Command 2|Focus Far|Zoom    |Zoom Tele|Down              |Up             |Left      |Right    |Always 0  |
  *  +---------+---------+--------+---------+------------------+---------------+----------+---------+----------+
  *
- * Pelco P Format
+ * Pelco P and BBV422 Format
  * Used to control Pan,Tilt,Zoom,Focus and Iris. Bytes 5 and 6 contain Pan and Tilt speeds
  *  +---------+--------+-------------+---------------+-------------+----------+---------+---------+----------+
  *  |         |  BIT 7 |    BIT 6    |     BIT 5     |   BIT 4     |  BIT 3   |  BIT 2  |  BIT 1  |  BIT 0   |
@@ -68,9 +73,8 @@
  *  |         |        |             |               |             |          |         |         |          |
  *  |Command 2|Unknown |Zoom Wide    |Zoom Tele      |Tilt Down    |Tilt Up   |Pan Left |Pan Right|Always 0  |
  *  +---------+--------+-------------+---------------+-------------+----------+---------+---------+----------+
- * The Pelco P table comes from various web sites and not from any formal documents and so the true meanings of
- * Command 1 bits 7,6,5 and 4 and Command 2 bit 7 is not properly known. One site lists some of these as
- * Camera On/Off and Auto Scan bits but cannot verify this.
+ * Some web sites state that for Pelco P, Command 1 bits 7,6,5 and 4 and Command 2 bit 7 have Camera On/Off and
+ * Auto Scan functions but this has not been verified.
  *
  *
  * EXTENDED COMMANDS
@@ -171,7 +175,7 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
 
         // Add to Bosch 8 byte buffer
 	if (new_byte & 0x80) {
-	    // MSB set to 1. This marks the start of a Bosch command so reset buffer counter
+	    // MSB is set to 1. This marks the start of a Bosch command so reset buffer counter
 	    this.bosch_command_index = 0;
 	}
         if (this.bosch_command_index < this.bosch_command_buffer.length) {
@@ -197,6 +201,17 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             this.decode(this.pelco_p_command_buffer);
             this.pelco_p_command_index = 0; // empty the buffer
         }
+
+
+        // BBV422 Protocol Test. Check if we have 8 bytes with byte 0 = 0xB0, byte 6 = 0xBF and with a valid XOR checksum
+        if (this.pelco_p_command_index === 8 && this.pelco_p_command_buffer[0] === 0xB0
+                                             && this.pelco_p_command_buffer[6] === 0xBF
+                                             && this.checksum_p_valid(this.pelco_p_command_buffer)) {
+            // Looks like we have a Pelco command. Try and process it
+            this.decode(this.pelco_p_command_buffer);
+            this.pelco_p_command_index = 0; // empty the buffer
+        }
+
 
         // Bosch Test. First byte has MSB of 1. First byte is the message size (excluding the checksum)
         var bosch_len = this.bosch_command_buffer[0] & 0x7F;
@@ -274,17 +289,18 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
         msg_string += 'D ';
     }
     if (pelco_p) {
-        //var sync      = pelco_command_buffer[0];
+        var stx       = pelco_command_buffer[0];
         var camera_id = pelco_command_buffer[1] + 1; // Pelco P sends Cam1 as 0x00
         var command_1 = pelco_command_buffer[2];
         var command_2 = pelco_command_buffer[3];
         var data_1 = pelco_command_buffer[4];
         var data_2 = pelco_command_buffer[5];
-        //var sync2  = pelco_command_buffer[6];
+        //var etx  = pelco_command_buffer[6];
         //var checksum  = pelco_command_buffer[7];
 
         var extended_command = ((command_2 & 0x01)==1);
-        msg_string += 'P ';
+        if (stx === 0xA0) msg_string += 'P ';
+        if (stx === 0xB0) msg_string += 'BBV ';
     }
 
 
