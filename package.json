@@ -23,5 +23,26 @@
   "scripts": {
     "test": "./node_modules/.bin/mocha --reporter spec",
     "coverage": "istanbul cover ./node_modules/mocha/bin/_mocha -- -R spec"
-  }
+  },
+  "keywords": [
+    "CCTV",
+    "Pelco",
+    "Bosch",
+    "Philips",
+    "Forward Vision",
+    "FV",
+    "Videmech",
+    "BBV",
+    "Building Block Video",
+    "serial",
+    "485",
+    "RS485",
+    "422",
+    "RS422",
+    "telemetry",
+    "protocol",
+    "pan",
+    "tilt",
+    "zoom"
+  ]
 }
