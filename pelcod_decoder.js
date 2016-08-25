@@ -131,12 +131,19 @@ function PelcoD_Decoder() {
     // Number of bytes in the current Buffer
     this.bosch_command_index = 0;
 
+    // A Buffer used for byte Forward Vision Protocol (FV Protocol)
+    // Min length is 8. Max length is 255
+    this.fv_command_buffer = new Buffer(255);
+
+    // Number of bytes in the current Buffer
+    this.fv_command_index = 0;
+
 }
 
 
 PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
 
-    // console.log('received ' + this.bytes_to_string(new_data_buffer,new_data_buffer.length) );
+    console.log('received ' + this.bytes_to_string(new_data_buffer,new_data_buffer.length) );
 
     // process each byte from new_data_buffer in turn
 
@@ -173,7 +180,7 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             this.pelco_p_command_buffer[this.pelco_p_command_buffer.length-1] = new_byte;
         }
 
-        // Add to Bosch 8 byte buffer
+        // Add to Bosch byte buffer
 	if (new_byte & 0x80) {
 	    // MSB is set to 1. This marks the start of a Bosch command so reset buffer counter
 	    this.bosch_command_index = 0;
@@ -184,6 +191,17 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             this.bosch_command_index++;
         }
 
+
+        // Add to Forward Vision (FV) byte buffer
+	if (new_byte == 0x0A) {
+	    // Always starts with 0x0A (LineFeed). Other bytes are 'ascii range'. Checksum is >= 128 (0x80 to 0xFF).
+	    this.fv_command_index = 0;
+	}
+        if (this.fv_command_index < this.fv_command_buffer.length) {
+            // Add the new_byte to the end of the fv_command_buffer
+            this.fv_command_buffer[this.fv_command_index] = new_byte;
+            this.fv_command_index++;
+        }
 
         // Pelco D Test. Check if we have 7 bytes with byte 0 = 0xFF and with a valid SUM checksum
         if (this.pelco_command_index === 7 && this.pelco_command_buffer[0] === 0xFF
@@ -222,6 +240,18 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             this.decode_bosch(this.bosch_command_buffer);
             this.bosch_command_index = 0; // empty the buffer
         }
+
+
+        // Forward Vision. Byte 0 is 0x0A. Checksum is only byte with MSB set to 1
+        if ((this.fv_command_buffer[0] == 0x0A)
+                                             && this.fv_command_index >= 8
+				             && (this.fv_command_buffer[this.fv_command_index-1] >= 128) // checksum
+                                             && this.checksum_fv_valid(this.fv_command_buffer, this.fv_command_index)) {
+            // Looks like we have a Forward Vision command. Try and process it
+            this.decode_forward_vision(this.fv_command_buffer, this.fv_command_index);
+            this.fv_command_index = 0; // empty the buffer
+        }
+
     }
 };
 
@@ -258,7 +288,7 @@ PelcoD_Decoder.prototype.checksum_bosch_valid = function(buffer,message_length) 
     for (var x = 0; x < (message_length - 1); x++) {
         total += buffer[x];
     }
-    var computed_checksum = total & 0x7F; // MSB set to 1 is reserved for first byte.
+    var computed_checksum = total & 0x7F; // Checksum has MSB of zero. MSB of 1 is reserved for first byte of message
     // Check if computed_checksum matches the last byte in the buffer
     if (computed_checksum === buffer[message_length - 1]) {
         return true;
@@ -266,6 +296,21 @@ PelcoD_Decoder.prototype.checksum_bosch_valid = function(buffer,message_length) 
         return false;
     }
 };
+
+PelcoD_Decoder.prototype.checksum_fv_valid = function(buffer,message_length) {
+    var computed_checksum = 0x00;
+    for (var x = 0; x < (message_length -1 ); x++) {
+        computed_checksum = computed_checksum ^ buffer[x]; // xor
+    }
+    computed_checksum = computed_checksum | 0x80; // set MSB to 1
+    // Check if computed_checksum matches the last byte in the buffer
+    if (computed_checksum === buffer[message_length - 1]) {
+        return true;
+    } else {
+        return false;
+    }
+};
+
 
 PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
 
@@ -424,7 +469,6 @@ PelcoD_Decoder.prototype.decode_bosch = function(bosch_command_buffer) {
 
     msg_string += 'Bosch ';
 
-    // TO DO - Add variable length message support
     var length      = bosch_command_buffer[0] & 0x7F;
     var high_order_address = bosch_command_buffer[1];
     var low_order_address = bosch_command_buffer[2];
@@ -582,6 +626,27 @@ PelcoD_Decoder.prototype.decode_bosch = function(bosch_command_buffer) {
 
     console.log(this.bytes_to_string(bosch_command_buffer,length+1) + ' ' + msg_string);
 };
+
+PelcoD_Decoder.prototype.decode_forward_vision = function(fv_command_buffer,fv_command_length) {
+
+    // Note Forward Vision is 9600 8-O-1    *** ODD PARITY ***
+
+    var msg_string ='';
+
+    msg_string += 'FV ';
+
+    var address_char_1 = fv_command_buffer[1];
+    var address_char_2 = fv_command_buffer[2];
+    var hex_string_address = '0x' + String.fromCharCode(address_char_1,address_char_2);
+    var camera_id = parseInt(hex_string_address);
+
+    msg_string += 'Camera ' + camera_id + ' ';
+
+    console.log(this.bytes_to_string(fv_command_buffer,fv_command_length) + ' ' + msg_string);
+};
+
+
+
 
 PelcoD_Decoder.prototype.bytes_to_string = function(buffer, length) {
     var byte_string = '';
