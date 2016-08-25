@@ -1,7 +1,7 @@
 {
   "name": "pelcod-decoder",
-  "version": "2.0.0",
-  "description": "Pelco D and Pelco P telemetry decoder for CCTV cameras",
+  "version": "2.2.0",
+  "description": "CCTV PTZ Telemetry Decoder for Pelco D, Pelco P, BBV422, Bosch/Philips and Forward Vision protocols",
   "license": "MIT",
   "author": {
     "name": "Roger Hardiman",
@@ -12,7 +12,8 @@
     "url": "https://github.com/rogerhardiman/node-pelcod-decoder.git"
   },
   "dependencies": {
-    "serialport": "^4.0.0"
+    "serialport": "^4.0.0",
+    "commander": "^2.9.0"
   },
   "devDependencies": {
     "chai": "^3.5.0",
