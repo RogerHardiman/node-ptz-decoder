@@ -627,6 +627,19 @@ PelcoD_Decoder.prototype.decode_bosch = function(bosch_command_buffer) {
     console.log(this.bytes_to_string(bosch_command_buffer,length+1) + ' ' + msg_string);
 };
 
+PelcoD_Decoder.prototype.fv_hex_ascii = function(byte_1,byte_2) {
+  // Byte 1 could be 0x31  = ASCII "1"
+  // Byte 2 could be 0x46 = ASCII "F"
+  // Convert Byte 1 and Byte 2 from 'bytes' into Chars, eg to "1" and "F"
+  // Combine the chars to a Hex String eg "0x1F"
+  // Convert the Hex String into an integer value
+
+  var hex_string = '0x' + String.fromCharCode(byte_1,byte_2);
+  var value = parseInt(hex_string);
+  return value;
+}
+
+
 PelcoD_Decoder.prototype.decode_forward_vision = function(fv_command_buffer,fv_command_length) {
 
     // Note Forward Vision is 9600 8-O-1    *** ODD PARITY ***
@@ -635,12 +648,118 @@ PelcoD_Decoder.prototype.decode_forward_vision = function(fv_command_buffer,fv_c
 
     msg_string += 'FV ';
 
-    var address_char_1 = fv_command_buffer[1];
-    var address_char_2 = fv_command_buffer[2];
-    var hex_string_address = '0x' + String.fromCharCode(address_char_1,address_char_2);
-    var camera_id = parseInt(hex_string_address);
+    var camera_id = this.fv_hex_ascii(fv_command_buffer[1], fv_command_buffer[2]);
+    var length = this.fv_hex_ascii(fv_command_buffer[3], fv_command_buffer[4]);
+    var control_flag_char = String.fromCharCode(fv_command_buffer[5]);
+    var control_code_char = String.fromCharCode(fv_command_buffer[6]);
 
     msg_string += 'Camera ' + camera_id + ' ';
+
+    if (control_code_char === 'G') {
+        var data1 = this.fv_hex_ascii(fv_command_buffer[7], fv_command_buffer[8]);
+        var data2 = this.fv_hex_ascii(fv_command_buffer[9], fv_command_buffer[10]);
+        var data3 = this.fv_hex_ascii(fv_command_buffer[11], fv_command_buffer[12]);
+        var pan_speed  = this.fv_hex_ascii(fv_command_buffer[13], fv_command_buffer[14]);
+        var tilt_speed = this.fv_hex_ascii(fv_command_buffer[15], fv_command_buffer[16]);
+
+        var focus_off_on   = (data1 >> 7) & 0x01;
+        var focus_near_far = (data1 >> 6) & 0x01;
+        var zoom_off_on    = (data1 >> 5) & 0x01;
+        var zoom_tele_wide = (data1 >> 4) & 0x01;
+        var tilt_off_on    = (data1 >> 3) & 0x01;
+        var tilt_up_down   = (data1 >> 2) & 0x01;
+        var pan_off_on     = (data1 >> 1) & 0x01;
+        var pan_left_right = (data1 >> 0) & 0x01;
+
+        var iris_sense_peak = (data2 >> 7) & 0x01;
+        var iris_control    = (data2 >> 4) & 0x07;
+        var iris_slow_fast  = (data2 >> 3) & 0x01;
+        var focus_slow_fast = (data2 >> 2) & 0x01;
+        var zoom_slow_fast  = (data2 >> 1) & 0x01;
+        var autopan_off_on  = (data2 >> 0) & 0x01;
+
+        var pan_tilt_scale_off_on = (data3 >> 7) & 0x01;
+        var wiper_off_on  = (data3 >> 6) & 0x01;
+        var washer_off_on = (data3 >> 5) & 0x01;
+        var lamp_control  = (data3 >> 3) & 0x03; // 2 bit value
+        var aux_3_off_on  = (data3 >> 2) & 0x01;
+        var aux_2_off_on  = (data3 >> 1) & 0x01;
+        var aux_1_off_on  = (data3 >> 0) & 0x01;
+
+        if (pan_off_on === 0) {
+            msg_string += '[pan stop     ]';
+        } else if (pan_off_on === 1 && pan_left_right === 0) {
+            msg_string += '[PAN LEFT ('+pan_speed+')]';
+        } else if (pan_off_on === 1 && pan_left_right === 1) {
+            msg_string += '[PAN RIGHT('+pan_speed+')]';
+        } else {
+            msg_string += '[PAN ???? ('+pan_speed+')]';
+        }
+
+        if (tilt_off_on === 0) {
+            msg_string += '[tilt stop    ]';
+        } else if (tilt_off_on === 1 && tilt_up_down === 0) {
+            msg_string += '[TILT UP  ('+tilt_speed+')]';
+        } else if (tilt_off_on === 1 && tilt_up_down === 1) {
+            msg_string += '[TILT DOWN('+tilt_speed+')]';
+        } else {
+            msg_string += '[TILT ????('+tilt_speed+')]';
+        }
+
+        if (zoom_off_on === 0) {
+            msg_string += '[zoom stop]';
+        } else if (zoom_off_on === 1 && zoom_tele_wide === 0) {
+            msg_string += '[ZOOM IN ('+zoom_slow_fast+')]';
+        } else if (zoom_off_on === 1 && zoom_tele_wide === 1) {
+            msg_string += '[ZOOM OUT('+zoom_slow_fast+')]';
+        } else {
+            msg_string += '[ZOOM ???]';
+        }
+
+        if (iris_control === 0) {
+            msg_string += '[iris stop]';
+        } else if (iris_control === 1) {
+            msg_string += '[IRIS CLOSE]';
+        } else if (iris_control === 2) {
+            msg_string += '[IRIS OPEN]';
+        } else if (iris_control === 3) {
+            msg_string += '[IRIS AUTO]';
+        } else {
+            msg_string += '[IRIS ????]';
+        }
+
+        if (focus_off_on === 0) {
+            msg_string += '[focus stop]';
+        } else if (focus_off_on === 1 && focus_near_far === 0) {
+            msg_string += '[FOCUS NEAR]';
+        } else if (focus_off_on === 1 && focus_near_far === 1) {
+            msg_string += '[FOCUS FAR ]';
+        } else {
+            msg_string += '[FOCUS ????]';
+        }
+
+	msg_string += ' Aux1='+aux_1_off_on;
+	msg_string += ' Aux2='+aux_2_off_on;
+	msg_string += ' Aux3='+aux_3_off_on;
+	msg_string += ' Wipe='+wiper_off_on;
+	msg_string += ' Wash='+washer_off_on;
+	msg_string += ' Lamp='+lamp_control;
+        
+    }
+    else if (control_code_char === 'L') {
+        var preset = this.fv_hex_ascii(fv_command_buffer[7], fv_command_buffer[8]);
+	
+	msg_string += 'Goto Preset ' + preset;
+    }
+    else if (control_code_char === 'M') {
+        var preset = this.fv_hex_ascii(fv_command_buffer[7], fv_command_buffer[8]);
+	
+	msg_string += 'Store Preset ' + preset;
+    }
+    else {
+        msg_string += 'Unknown Command Code ' + control_code_char;
+    }
+
 
     console.log(this.bytes_to_string(fv_command_buffer,fv_command_length) + ' ' + msg_string);
 };
