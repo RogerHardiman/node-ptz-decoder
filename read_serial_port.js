@@ -24,12 +24,13 @@ args.version(version);
 args.description('Pelco D and Pelco P parser');
 args.option('-p, --port <name>','Serial Port eg COM1 or /dev/ttyUSB0');
 args.option('-b, --baud <value>','Baud Rate. Default 2400',parseInt);
+args.option('--parity <value>','Parity none, even, odd. Default none');
 args.option('-l, --list','List serial ports');
 args.parse(process.argv);
 
 // Initial message
 console.log('');
-console.log('Decode Pelco D and Pelco P Telemetry');
+console.log('CCTV Telemetry Decoder');
 console.log('(c) Roger Hardiman 2016 www.rjh.org.uk');
 console.log('Use -h for help');
 console.log('');
@@ -55,20 +56,24 @@ if (args.list || (!args.port)) {
 
 
 
-// Defaults
+// Defaults 2400 8-N-1
 var baud_rate = 2400;
+var data_bits = 8;
+var parity = 'none';
+var stop_bits = 1;
 
 // User Settings
 if (args.port) serial_port = args.port;
 if (args.baud) baud_rate = args.baud;
+if (args.parity === 'none' || args.parity === 'odd' || args.parity === 'even') parity = args.parity;
 
 // Open Serial Port.
 var pelco_d_decoder = new PelcoD_Decoder();
 var port = new SerialPort(serial_port, {
     baudrate: baud_rate,
-    parity: 'none',
-    dataBits: 8,
-    stopBits: 1,
+    parity: parity,
+    dataBits: data_bits,
+    stopBits: stop_bits,
 });
 
 
