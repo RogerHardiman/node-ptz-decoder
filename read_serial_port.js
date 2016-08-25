@@ -22,15 +22,17 @@ var args = require('commander');
 // Command line arguments
 args.version(version);
 args.description('Pelco D and Pelco P parser');
+args.option('-l, --list','List serial ports');
+args.option('-v, --verbose','Verbose mode. Show all data bytes');
 args.option('-p, --port <name>','Serial Port eg COM1 or /dev/ttyUSB0');
 args.option('-b, --baud <value>','Baud Rate. Default 2400',parseInt);
 args.option('--parity <value>','Parity none, even, odd. Default none');
-args.option('-l, --list','List serial ports');
 args.parse(process.argv);
 
 // Initial message
 console.log('');
 console.log('CCTV Telemetry Decoder');
+console.log('Pelco D, Pelco P, BBV, Bosch, Philips, Forward Vision');
 console.log('(c) Roger Hardiman 2016 www.rjh.org.uk');
 console.log('Use -h for help');
 console.log('');
@@ -95,6 +97,7 @@ port.on('open', function(err) {
 
 // Callback - Data
 port.on('data', function(buffer) {
+    if (args.verbose) console.log(BufferToHexString(buffer));
     pelco_d_decoder.processBuffer(buffer);
 });
 
@@ -103,4 +106,22 @@ port.on('disconnect', function(err) {
     console.log('Disconnected');
     process.exit(1);
 });
+
+// helper functions
+function BufferToHexString(buffer) {
+    var byte_string = '';
+    for (var i = 0; i < buffer.length; i++) {
+        byte_string += '[' + DecToHexPad(buffer[i],2) + ']';
+    }
+    return byte_string;
+};
+
+// helper functions
+function DecToHexPad(decimal,size) {
+    var ret_string = decimal.toString('16');
+    while (ret_string.length < size) {
+        ret_string = '0' + ret_string;
+    }
+    return ret_string;
+};
 
