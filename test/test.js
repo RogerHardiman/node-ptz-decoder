@@ -1,8 +1,17 @@
 // Mocha tests
-// Note - currently the checks rely upon checking the 
 
 var expect    = require("chai").expect;
 var PelcoD_Decoder = require("../pelcod_decoder.js");
+
+function AppendStringToByteArray(str,bytes)
+{
+   for (var i = 0; i < str.length; ++i)
+   {
+      var charCode = str.charCodeAt(i);
+      if (charCode > 0xFF) bytes.push('.'); // char > 1 byte unicode.
+      else bytes.push(charCode);
+   }
+}
 
 describe("Pelco D Decoder", function() {
 
@@ -271,6 +280,7 @@ describe("Pelco D Decoder", function() {
     it("tests garbage then data", function() {
       var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [
+0x00,0x00,0x00,
 0x86,0x00,0x23,0x07,0x02,0x01,0x33,
 0x86,0x00,0x23,0x07,0x02,0x02,0x34,
 0x86,0x00,0x23,0x07,0x02,0x03,0x35,
@@ -301,6 +311,53 @@ describe("Pelco D Decoder", function() {
       pelcod_decoder.processBuffer(buf);
     });
   });
+
+  describe("Forward Vision Telemetry block of data", function() {
+    it("tests garbage then data", function() {
+      var pelcod_decoder = new PelcoD_Decoder();
+      var bytes = []
+      bytes.push(0x01, 0x02, 0x03);
+
+      // Tilt up Dome 41
+      bytes.push(0x0A);
+      AppendStringToByteArray('29126G083200008E',bytes);
+      bytes.push(0x87);
+
+      // Pan left at speed 50 on Dome 2
+      bytes.push(0x0A);
+      AppendStringToByteArray('02126G0230003200',bytes);
+      bytes.push(0xFA);
+
+      // Pan right at speed 255 on Dome 2
+      bytes.push(0x0A);
+      AppendStringToByteArray('02126G033000FF00',bytes);
+      bytes.push(0xFA);
+
+      // Stop on Dome 2
+      bytes.push(0x0A);
+      AppendStringToByteArray('02126G0030000000',bytes);
+      bytes.push(0xF9);
+
+      // Zoom in on Dome 2
+      bytes.push(0x0A);
+      AppendStringToByteArray('02126G2030000000',bytes);
+      bytes.push(0xFB);
+
+      // Goto preset 7 on Dome 2
+      bytes.push(0x0A);
+      AppendStringToByteArray('020A6L07',bytes);
+      bytes.push(0x84);
+
+      // Pan right at speed 255 on Dome address 6
+      bytes.push(0x0A);
+      AppendStringToByteArray('06122G033000FF00',bytes);
+      bytes.push(0xFA);
+
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
+
 
 
 });
