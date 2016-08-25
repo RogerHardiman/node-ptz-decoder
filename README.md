@@ -32,6 +32,12 @@ The Forward Vision commands decoded include
   * Set Zoom Speed
 
 
+# Installation
+Run the following command form the command line to install the NPM package
+```
+npm install pelcod-decoder
+```
+
 # Command Line Test Program
 The command line test program is executed as
 ```
