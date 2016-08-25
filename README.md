@@ -41,6 +41,7 @@ This opens a serial port, waits for bytes and then decodes their meaning.
 The following flags customise the usage
  * -h    help
  * -l    list available serial port
+ * -v    verbose. Show raw bytes read read from serial port
  * -V    version
  * --baud value
  * --parity value (values are none,even,odd)
