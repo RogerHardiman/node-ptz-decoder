@@ -143,7 +143,7 @@ function PelcoD_Decoder() {
 
 PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
 
-    console.log('received ' + this.bytes_to_string(new_data_buffer,new_data_buffer.length) );
+    // console.log('received ' + this.bytes_to_string(new_data_buffer,new_data_buffer.length) );
 
     // process each byte from new_data_buffer in turn
 
