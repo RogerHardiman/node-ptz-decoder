@@ -1,7 +1,7 @@
 {
   "name": "pelcod-decoder",
-  "version": "2.2.1",
-  "description": "CCTV PTZ Telemetry Decoder for Pelco D, Pelco P, BBV422, Bosch/Philips and Forward Vision protocols",
+  "version": "2.2.2",
+  "description": "CCTV PTZ Telemetry Decoder for Pelco D, Pelco P, BBV422, Bosch/Philips, Forward Vision and Vicon protocols",
   "license": "MIT",
   "author": {
     "name": "Roger Hardiman",
@@ -34,6 +34,7 @@
     "Videmech",
     "BBV",
     "Building Block Video",
+    "Vicon",
     "serial",
     "485",
     "RS485",
