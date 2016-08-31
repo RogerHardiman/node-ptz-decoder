@@ -1,112 +1,13 @@
 /*
- *
- * Read and decode Pelco D, Pelco P, BBV422 and Bosch/Philips CCTV commands
- * Used to monitor the output from Pelco systems or the inputs into Pelco cameras
+ * Read and decode Pelco D, Pelco P, BBV422, Bosch/Philips, Forward Vision and Vicon CCTV commands
+ * This code is not designed to decode every command.
+ * The purpose is to monitor the output from various CCTV systems to confirm the protocols and camera addresses in use.
+ * The meanings of certain Aux signals and special Preset values is not shown
+ * 
  * (c) Copyright 2016 Roger Hardiman
  *
- *
- * Read the Buffer() objects from the a stream and process Pelco D, Pelco P, BBV422 and Bosch/Philips messages
- * Buffer() objects may have multiple PTZ messages or just part of a message
- * so bytes are cached if needed
- *
- */
-/*
- *  SOURCE MATERIAL
- *  Pelco D data sheet (official Pelco document - 1999 Edition)
- *  Official Pelco KBD300A in Direct D and Direct P modes
- *
- *  NuOptic D Protocol http://www.nuoptic.com/wp-content/uploads/files/NuOptic_VIS-1000_D-Protocol_Reference.pdf
- *  CodeProject Pelco D and Pelco P pages http://www.codeproject.com/Articles/8034/Pelco-P-and-D-protocol-implementation-in-C
- *  ZoneMinder Source Code https://github.com/ZoneMinder/ZoneMinder/tree/master/scripts/ZoneMinder/lib/ZoneMinder/Control 
- *  iSpyConnect Source Code https://github.com/ispysoftware/iSpy/tree/master/Pelco
- *  Node-Pelco Source Code https://github.com/Scoup/node-pelcod
- *  CommFront 232 Analizer https://www.commfront.com/pages/pelco-d-protocol-tutorial
- *  CommFront 232 Analizer https://www.commfront.com/pages/pelco-p-protocol-tutorial
- *
- *  BBV Web Site for BBV422 Telemetry Format
- *
- *  Bosch Web Site for Bosch OSRD protocol format
- * 
- *  Pelco D Commands are 7 bytes long, start with 0xFF and have a 'sum' checksum
- *  Checksum is Sum of bytes 2 to 6 Modulo 256
- *  Camera 1 has Address 01
- *  +-----------+---------+-----------+-----------+--------+--------+-----------+
- *  |   BYTE 1  | BYTE 2  |  BYTE 3   |  BYTE 4   | BYTE 5 | BYTE 6 |  BYTE 7   |
- *  +-----------+---------+-----------+-----------+--------+--------+-----------+
- *  |           |         |           |           |        |        |           |
- *  | Sync(0xFF)| Address | Command 1 | Command 2 | Data 1 | Data 2 | Check Sum |
- *  +-----------+---------+-----------+-----------+--------+--------+-----------+
- *
- *  Pelco P Commands (and BBV422) are 8 bytes long, include STX and ETX and have a 'XOR' checksum
- *  Checksum is XOR of bytes 1 to 7
- *  Camera 1 has Address 00
- *  +-----------+---------+-----------+-----------+--------+--------+-----------+-----------+
- *  |   BYTE 1  | BYTE 2  |  BYTE 3   |  BYTE 4   | BYTE 5 | BYTE 6 |   BYTE 7  |  BYTE 8   |
- *  +-----------+---------+-----------+-----------+--------+--------+-----------+-----------+
- *  |           |         |           |           |        |        |           |           |
- *  | STX(0xA0) | Address | Command 1 | Command 2 | Data 1 | Data 2 | ETX(0xAF) | Check Sum | Pelco P
- *  | STX(0xB0) | Address | Command 1 | Command 2 | Data 1 | Data 2 | ETX(0xBF) | Check Sum | BBV422
- *  +-----------+---------+-----------+-----------+--------+--------+-----------+-----------+
- *
- *  There are two types of command - Standard and Extended
- *
- *
- * STANDARD COMMANDS
- * Pelco D Format
- * Used to control Pan,Tilt,Zoom,Focus and Iris. Bytes 5 and 6 contain Pan and Tilt speeds
- *  +---------+---------+--------+---------+------------------+---------------+----------+---------+----------+
- *  |         |  BIT 7  | BIT 6  |  BIT 5  |      BIT 4       |     BIT 3     |  BIT 2   |  BIT 1  |  BIT 0   |
- *  +---------+---------+--------+---------+------------------+---------------+----------+---------+----------+
- *  |         |         |        |         |                  |               |          |         |          |
- *  |Command 1|Sense    |Reserved|Reserved |Auto / Manual Scan|Camera On / Off|Iris Close|Iris Open|Focus Near|
- *  |         |         |        |         |                  |               |          |         |          |
- *  |Command 2|Focus Far|Zoom    |Zoom Tele|Down              |Up             |Left      |Right    |Always 0  |
- *  +---------+---------+--------+---------+------------------+---------------+----------+---------+----------+
- *
- * Pelco P and BBV422 Format
- * Used to control Pan,Tilt,Zoom,Focus and Iris. Bytes 5 and 6 contain Pan and Tilt speeds
- *  +---------+--------+-------------+---------------+-------------+----------+---------+---------+----------+
- *  |         |  BIT 7 |    BIT 6    |     BIT 5     |   BIT 4     |  BIT 3   |  BIT 2  |  BIT 1  |  BIT 0   |
- *  +---------+--------+-------------+---------------+-------------+----------+---------+---------+----------+
- *  |         |        |             |               |             |          |         |         |          |
- *  |Command 1|Unknown |Unknown      |Unknown        |Unknown      |Iris Close|Iris Open|Focus Near|Focus Far|
- *  |         |        |             |               |             |          |         |         |          |
- *  |Command 2|Unknown |Zoom Wide    |Zoom Tele      |Tilt Down    |Tilt Up   |Pan Left |Pan Right|Always 0  |
- *  +---------+--------+-------------+---------------+-------------+----------+---------+---------+----------+
- * Some web sites state that for Pelco P, Command 1 bits 7,6,5 and 4 and Command 2 bit 7 have Camera On/Off and
- * Auto Scan functions but this has not been verified.
- *
- *
- * EXTENDED COMMANDS
- * Bit 0 of Command 2 is set to '1' for extended commands.
- * Bytes 3,4,5 and 6 contain the extended command and any values
- * There are a large number of extended commands. This code processes the common commands.
- *  +--------------------------------+--------+--------+--------+-------------+----+
- *  |                                | BYTE 3 | BYTE 4 | BYTE 5 | BYTE 6      |D/P |
- *  |                                | Cmd 1  | Cmd 2  | Data 1 | Data 2      |    |
- *  +--------------------------------+--------+--------+--------+-------------+----+
- *  |                                |        |        |        |             |    |
- *  | Set Preset                     | 00     | 03     | 00     | value       |Both|
- *  |                                |        |        |        |             |    |
- *  | Clear Preset                   | 00     | 05     | 00     | value       |Both|
- *  |                                |        |        |        |             |    |
- *  | Go To Preset                   | 00     | 07     | 00     | value       |Both|
- *  |   Flip (180deg about)          | 00     | 07     | 00     | 21          |    |
- *  |   Go To Zero Pan               | 00     | 07     | 00     | 22          |    |
- *  |                                |        |        |        |             |    |
- *  | Set Auxiliary                  | 00     | 09     | 00     | value       |Both|
- *  |                                |        |        |        |             |    |
- *  | Clear Auxiliary                | 00     | 0B     | 00     | value       |Both|
- *  |                                |        |        |        |             |    |
- *  | Set Pattern Start              | 00     | 1F     | 00     | value       |Both|
- *  |                                |        |        |        |             |    |
- *  | Set Pattern Stop               | 00     | 21     | 00     | value       |Both|
- *  |                                |        |        |        |             |    |
- *  | Run Pattern                    | 00     | 23     | 00     | value       |Both|
- *  |                                |        |        |        |             |    |
- *  | Set Zoom Speed                 | 00     | 25     | 00     | value (0-3) |Both|
- *  |                                |        |        |        |             |    |
- *  +--------------------------------+--------+--------+--------+-------------+----+
+ * Processes NodeJS Buffer() data.
+ * Buffer() objects may have multiple PTZ messages or just part of a message so bytes are cached if needed.
  *
  */
 
@@ -138,6 +39,11 @@ function PelcoD_Decoder() {
     // Number of bytes in the current Buffer
     this.fv_command_index = 0;
 
+    // A Buffer used for Vicon
+    this.vicon_command_buffer = new Buffer(10);
+
+    // Number of bytes in the current Buffer
+    this.vicon_command_index = 0;
 }
 
 
@@ -152,7 +58,9 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
         // Get the next new byte
         var new_byte = new_data_buffer[i];
 
-        // Add to Pelco D buffer
+        // Add to the end of the Pelco D buffer
+	// We cannot simply look for 0xFF as this could be
+	// part of the payload as well as the header
         if (this.pelco_command_index < this.pelco_command_buffer.length) {
             // Add the new_byte to the end of the pelco_command_buffer
             this.pelco_command_buffer[this.pelco_command_index] = new_byte;
@@ -166,7 +74,9 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             this.pelco_command_buffer[this.pelco_command_buffer.length-1] = new_byte;
         }
 
-        // Add to Pelco P buffer
+        // Add to the end of Pelco P buffer
+	// We cannot simply look for 0xA0 as this could be
+	// part of the payload as well as the header value
         if (this.pelco_p_command_index < this.pelco_p_command_buffer.length) {
             // Add the new_byte to the end of the pelco_p_command_buffer
             this.pelco_p_command_buffer[this.pelco_p_command_index] = new_byte;
@@ -191,10 +101,9 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             this.bosch_command_index++;
         }
 
-
         // Add to Forward Vision (FV) byte buffer
 	if (new_byte == 0x0A) {
-	    // Always starts with 0x0A (LineFeed). Other bytes are 'ascii range'. Checksum is >= 128 (0x80 to 0xFF).
+	    // Always starts with 0x0A (LineFeed). Other bytes are 'ascii range'. Checksum is >= 128 (0x80 to 0xFF) so 0x0A is unique.
 	    this.fv_command_index = 0;
 	}
         if (this.fv_command_index < this.fv_command_buffer.length) {
@@ -202,6 +111,20 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             this.fv_command_buffer[this.fv_command_index] = new_byte;
             this.fv_command_index++;
         }
+
+        // Add to Vicon byte buffer
+	if (new_byte & 0x80) {
+	    // MSB is set to 1. This marks the start of a Vicon command so reset buffer counter
+	    this.vicon_command_index = 0;
+	}
+        if (this.vicon_command_index < this.vicon_command_buffer.length) {
+            // Add the new_byte to the end of the vicon_command_buffer
+            this.vicon_command_buffer[this.vicon_command_index] = new_byte;
+            this.vicon_command_index++;
+        }
+
+
+
 
         // Pelco D Test. Check if we have 7 bytes with byte 0 = 0xFF and with a valid SUM checksum
         if (this.pelco_command_index === 7 && this.pelco_command_buffer[0] === 0xFF
@@ -250,6 +173,15 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             // Looks like we have a Forward Vision command. Try and process it
             this.decode_forward_vision(this.fv_command_buffer, this.fv_command_index);
             this.fv_command_index = 0; // empty the buffer
+        }
+
+
+        // Vicon. 10 bytes where Byte 1 has a MSB of 1
+        if ((this.vicon_command_buffer[0] & 0x80)
+                                             && (this.vicon_command_index == 10 )) {
+            // Looks like we have a Vicon command. Try and process it
+            this.decode_vicon(this.vicon_command_buffer, this.vicon_command_index);
+            this.vicon_command_index = 0; // empty the buffer
         }
 
     }
@@ -764,6 +696,99 @@ PelcoD_Decoder.prototype.decode_forward_vision = function(fv_command_buffer,fv_c
     console.log(this.bytes_to_string(fv_command_buffer,fv_command_length) + ' ' + msg_string);
 };
 
+
+PelcoD_Decoder.prototype.decode_vicon = function(vicon_command_buffer,vicon_command_length) {
+
+    // Does not appear to be any checksum
+    // Byte 1. MSB set to 1.
+
+        var msg_string ='';
+
+        msg_string += 'Vicon ';
+
+        var camera_id = ((vicon_command_buffer[0] & 0x0F)*16) + (vicon_command_buffer[1] & 0x0F);
+
+        var left  = (vicon_command_buffer[2] >> 6) & 0x01;  // 0x40
+        var right = (vicon_command_buffer[2] >> 5) & 0x01;  // 0x20
+        var up    = (vicon_command_buffer[2] >> 4) & 0x01;  // 0x10
+        var down  = (vicon_command_buffer[2] >> 3) & 0x01;  // 0x08
+        var auto_pan = (vicon_command_buffer[2] >> 2) & 0x01;  // 0x04
+
+        var zoom_out   = (vicon_command_buffer[3] >> 6) & 0x01;  // 0x40
+        var zoom_in    = (vicon_command_buffer[3] >> 5) & 0x01;  // 0x20
+        var focus_far  = (vicon_command_buffer[3] >> 4) & 0x01;  // 0x10
+        var focus_near = (vicon_command_buffer[3] >> 3) & 0x01;  // 0x08
+        var iris_open  = (vicon_command_buffer[3] >> 2) & 0x01;  // 0x04
+        var iris_close = (vicon_command_buffer[3] >> 1) & 0x01;  // 0x02
+
+        var goto_preset = (vicon_command_buffer[6] === 0x10 ? 1 : 0); // >> 4) & 0x01;  // 0x10
+        var preset_value = (vicon_command_buffer[7]);
+
+        var pan_speed = (vicon_command_buffer[6] << 7) | (vicon_command_buffer[7]);
+        var tilt_speed = (vicon_command_buffer[8] << 7) | (vicon_command_buffer[9]);
+
+        msg_string += 'Camera ' + camera_id + ' ';
+
+        if (left === 0 && right === 0) {
+            msg_string += '[pan stop     ]';
+        } else if (left === 1 && right === 0) {
+            msg_string += '[PAN LEFT ('+pan_speed+')]';
+        } else if (left === 0 && right === 1) {
+            msg_string += '[PAN RIGHT('+pan_speed+')]';
+        } else { // left === 1 && right === 1)
+            msg_string += '[PAN ???? ('+pan_speed+')]';
+        }
+
+        if (up === 0 && down === 0) {
+            msg_string += '[tilt stop    ]';
+        } else if (up === 1 && down === 0) {
+            msg_string += '[TILT UP  ('+tilt_speed+')]';
+        } else if (up === 0 && down === 1) {
+            msg_string += '[TILT DOWN('+tilt_speed+')]';
+        } else { // (up === 1 && down === 1)
+            msg_string += '[TILT ????('+tilt_speed+')]';
+        }
+
+        if (zoom_in === 0 && zoom_out === 0) {
+            msg_string += '[zoom stop]';
+        } else if (zoom_in === 1 && zoom_out === 0) {
+            msg_string += '[ZOOM IN]';
+        } else if (zoom_in === 0 && zoom_out === 1) {
+            msg_string += '[ZOOM OUT]';
+        } else { // (zoom_in === 1 && zoom_out === 1)
+            msg_string += '[ZOOM ???]';
+        }
+
+        if (iris_open === 0 && iris_close === 0) {
+            msg_string += '[iris stop ]';
+        } else if (iris_open === 1 && iris_close === 0) {
+            msg_string += '[IRIS OPEN ]';
+        } else if (iris_open === 0 && iris_close === 1) {
+            msg_string += '[IRIS CLOSE]';
+        } else { // (iris_open === 1 && iris_close === 1)
+            msg_string += '[IRIS ???? ]';
+        }
+
+        if (focus_near === 0 && focus_far === 0) {
+            msg_string += '[focus stop]';
+        } else if (focus_near === 1 && focus_far === 0) {
+            msg_string += '[FOCUS NEAR]';
+        } else if (focus_near === 0 && focus_far === 1) {
+            msg_string += '[FOCUS FAR ]';
+        } else { // (focus_near === 1 && focus_far === 1)
+            msg_string += '[FOCUS ????]';
+        }
+
+        if (auto_pan === 1) {
+            msg_string += '[AutoPan]';
+	}
+
+        if (goto_preset === 1) {
+            msg_string += '[Goto Preset '+ preset_value + ']';
+	}
+
+        console.log(this.bytes_to_string(vicon_command_buffer,vicon_command_length) + ' ' + msg_string);
+};
 
 
 
