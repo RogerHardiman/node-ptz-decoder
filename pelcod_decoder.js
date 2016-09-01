@@ -59,8 +59,8 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
         var new_byte = new_data_buffer[i];
 
         // Add to the end of the Pelco D buffer
-	// We cannot simply look for 0xFF as this could be
-	// part of the payload as well as the header
+        // We cannot simply look for 0xFF as this could be
+        // part of the payload as well as the header
         if (this.pelco_command_index < this.pelco_command_buffer.length) {
             // Add the new_byte to the end of the pelco_command_buffer
             this.pelco_command_buffer[this.pelco_command_index] = new_byte;
@@ -75,8 +75,8 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
         }
 
         // Add to the end of Pelco P buffer
-	// We cannot simply look for 0xA0 as this could be
-	// part of the payload as well as the header value
+        // We cannot simply look for 0xA0 as this could be
+        // part of the payload as well as the header value
         if (this.pelco_p_command_index < this.pelco_p_command_buffer.length) {
             // Add the new_byte to the end of the pelco_p_command_buffer
             this.pelco_p_command_buffer[this.pelco_p_command_index] = new_byte;
@@ -91,10 +91,10 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
         }
 
         // Add to Bosch byte buffer
-	if (new_byte & 0x80) {
-	    // MSB is set to 1. This marks the start of a Bosch command so reset buffer counter
-	    this.bosch_command_index = 0;
-	}
+        if (new_byte & 0x80) {
+            // MSB is set to 1. This marks the start of a Bosch command so reset buffer counter
+            this.bosch_command_index = 0;
+        }
         if (this.bosch_command_index < this.bosch_command_buffer.length) {
             // Add the new_byte to the end of the bosch_command_buffer
             this.bosch_command_buffer[this.bosch_command_index] = new_byte;
@@ -102,10 +102,10 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
         }
 
         // Add to Forward Vision (FV) byte buffer
-	if (new_byte == 0x0A) {
-	    // Always starts with 0x0A (LineFeed). Other bytes are 'ascii range'. Checksum is >= 128 (0x80 to 0xFF) so 0x0A is unique.
-	    this.fv_command_index = 0;
-	}
+        if (new_byte == 0x0A) {
+            // Always starts with 0x0A (LineFeed). Other bytes are 'ascii range'. Checksum is >= 128 (0x80 to 0xFF) so 0x0A is unique.
+            this.fv_command_index = 0;
+        }
         if (this.fv_command_index < this.fv_command_buffer.length) {
             // Add the new_byte to the end of the fv_command_buffer
             this.fv_command_buffer[this.fv_command_index] = new_byte;
@@ -113,10 +113,10 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
         }
 
         // Add to Vicon byte buffer
-	if (new_byte & 0x80) {
-	    // MSB is set to 1. This marks the start of a Vicon command so reset buffer counter
-	    this.vicon_command_index = 0;
-	}
+        if (new_byte & 0x80) {
+            // MSB is set to 1. This marks the start of a Vicon command so reset buffer counter
+            this.vicon_command_index = 0;
+        }
         if (this.vicon_command_index < this.vicon_command_buffer.length) {
             // Add the new_byte to the end of the vicon_command_buffer
             this.vicon_command_buffer[this.vicon_command_index] = new_byte;
@@ -168,7 +168,7 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
         // Forward Vision. Byte 0 is 0x0A. Checksum is only byte with MSB set to 1
         if ((this.fv_command_buffer[0] == 0x0A)
                                              && this.fv_command_index >= 8
-				             && (this.fv_command_buffer[this.fv_command_index-1] >= 128) // checksum
+                                             && (this.fv_command_buffer[this.fv_command_index-1] >= 128) // checksum
                                              && this.checksum_fv_valid(this.fv_command_buffer, this.fv_command_index)) {
             // Looks like we have a Forward Vision command. Try and process it
             this.decode_forward_vision(this.fv_command_buffer, this.fv_command_index);
@@ -253,6 +253,7 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
     if (pelco_command_buffer.length == 7) pelco_d = true;
     if (pelco_command_buffer.length == 8) pelco_p = true;
 
+
     if (pelco_d) {
         //var sync      = pelco_command_buffer[0];
         var camera_id = pelco_command_buffer[1];
@@ -281,7 +282,6 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
     }
 
 
-	
     msg_string += 'Camera ' + camera_id + ' ';
     
 
@@ -515,7 +515,7 @@ PelcoD_Decoder.prototype.decode_bosch = function(bosch_command_buffer) {
         else if (function_code == 8) msg_string += 'Cancel Latching Aux ' + data;
         else if (function_code == 9) msg_string += 'Latching Aux On ' + data;
         else if (function_code == 10) msg_string += 'Latching Aux Off ' + data;
-	else msg_string += 'unknown aux or pre-position command ' + function_code + ' with value ' + data;
+        else msg_string += 'unknown aux or pre-position command ' + function_code + ' with value ' + data;
     }
     else if (op_code == 0x08) {
         msg_string += 'Repetitive Variable-speed PTZ, Focus and Iris';
@@ -670,23 +670,23 @@ PelcoD_Decoder.prototype.decode_forward_vision = function(fv_command_buffer,fv_c
             msg_string += '[FOCUS ????]';
         }
 
-	msg_string += ' Aux1='+aux_1_off_on;
-	msg_string += ' Aux2='+aux_2_off_on;
-	msg_string += ' Aux3='+aux_3_off_on;
-	msg_string += ' Wipe='+wiper_off_on;
-	msg_string += ' Wash='+washer_off_on;
-	msg_string += ' Lamp='+lamp_control;
+        msg_string += ' Aux1='+aux_1_off_on;
+        msg_string += ' Aux2='+aux_2_off_on;
+        msg_string += ' Aux3='+aux_3_off_on;
+        msg_string += ' Wipe='+wiper_off_on;
+        msg_string += ' Wash='+washer_off_on;
+        msg_string += ' Lamp='+lamp_control;
         
     }
     else if (control_code_char === 'L') {
         var preset = this.fv_hex_ascii(fv_command_buffer[7], fv_command_buffer[8]);
-	
-	msg_string += 'Goto Preset ' + preset;
+
+        msg_string += 'Goto Preset ' + preset;
     }
     else if (control_code_char === 'M') {
         var preset = this.fv_hex_ascii(fv_command_buffer[7], fv_command_buffer[8]);
-	
-	msg_string += 'Store Preset ' + preset;
+
+        msg_string += 'Store Preset ' + preset;
     }
     else {
         msg_string += 'Unknown Command Code ' + control_code_char;
@@ -781,11 +781,11 @@ PelcoD_Decoder.prototype.decode_vicon = function(vicon_command_buffer,vicon_comm
 
         if (auto_pan === 1) {
             msg_string += '[AutoPan]';
-	}
+        }
 
         if (goto_preset === 1) {
             msg_string += '[Goto Preset '+ preset_value + ']';
-	}
+        }
 
         console.log(this.bytes_to_string(vicon_command_buffer,vicon_command_length) + ' ' + msg_string);
 };
