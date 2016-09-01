@@ -59,6 +59,7 @@ if (args.list || (!args.port)) {
 
 
 // Defaults 2400 8-N-1
+var serial_port = '/dev/ttyUSB0';
 var baud_rate = 2400;
 var data_bits = 8;
 var parity = 'none';
@@ -103,7 +104,7 @@ port.on('data', function(buffer) {
 
 // Callback - Disconnected (eg USB removal) 
 port.on('disconnect', function(err) {
-    console.log('Disconnected');
+    console.log('Disconnected ' + err);
     process.exit(1);
 });
 
@@ -114,7 +115,7 @@ function BufferToHexString(buffer) {
         byte_string += '[' + DecToHexPad(buffer[i],2) + ']';
     }
     return byte_string;
-};
+}
 
 // helper functions
 function DecToHexPad(decimal,size) {
@@ -123,5 +124,5 @@ function DecToHexPad(decimal,size) {
         ret_string = '0' + ret_string;
     }
     return ret_string;
-};
+}
 
