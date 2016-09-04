@@ -176,8 +176,10 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
         }
 
 
-        // Vicon. 10 bytes where Byte 1 has a MSB of 1
-        if ((this.vicon_command_buffer[0] & 0x80)
+        // Vicon. 10 bytes where Byte 1 upper nibble is 1000
+	// and Byte 2 has bit 6 set (meaning extended command)
+        if (((this.vicon_command_buffer[0] & 0xF0) === 0x80)
+                                             && (this.vicon_command_buffer[1] & 0x40)
                                              && (this.vicon_command_index == 10 )) {
             // Looks like we have a Vicon command. Try and process it
             this.decode_vicon(this.vicon_command_buffer, this.vicon_command_index);
