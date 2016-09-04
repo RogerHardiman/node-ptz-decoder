@@ -1,5 +1,5 @@
 /*
- * Read and decode Pelco D and Pelco P CCTV commands from a Serial Port / COM Port (using node-serialport)
+ * Read and decode CCTV PTZ commands from a Serial Port / COM Port (using node-serialport)
  * Copyright 2016 Roger Hardiman
  *
  * Note that the Serial Port varies between operating systems
@@ -21,7 +21,7 @@ var args = require('commander');
 
 // Command line arguments
 args.version(version);
-args.description('Pelco D and Pelco P parser');
+args.description('Pelco D, Pelco P, BBV422, Philips/Bosch, Vicon and Forward Vision parser');
 args.option('-l, --list','List serial ports');
 args.option('-v, --verbose','Verbose mode. Show all data bytes');
 args.option('-p, --port <name>','Serial Port eg COM1 or /dev/ttyUSB0');
@@ -32,7 +32,7 @@ args.parse(process.argv);
 // Initial message
 console.log('');
 console.log('CCTV Telemetry Decoder');
-console.log('Pelco D, Pelco P, BBV, Bosch, Philips, Forward Vision');
+console.log('Pelco D, Pelco P, BBV, Bosch, Philips, Forward Vision, Vicon');
 console.log('(c) Roger Hardiman 2016 www.rjh.org.uk');
 console.log('Use -h for help');
 console.log('');
