@@ -42,7 +42,7 @@ The Vicon commands decoded include
   * Auto Pan
 
 The American Dynamics AD422/Sensormatic commands decoded include
-  * Camera Number
+  * Camera Number
   * Pan  (direction and speed)
   * Tilt (direction and speed)
   * Zoom (Tele/In and Wide/Out)
