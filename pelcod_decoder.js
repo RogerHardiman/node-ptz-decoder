@@ -974,6 +974,16 @@ PelcoD_Decoder.prototype.decode_ad422 = function(ad_command_buffer) {
         else if (direction == 0x84) msg_string += 'Tilt Up (' + speed + ')';
         else if (direction == 0x85) msg_string += 'Tilt Down (' + speed + ')';
     }
+    else if (command_code == 0xCC) {
+        var additional_command = ad_command_buffer[2];
+        if (additional_command == 0x08) msg_string += 'Auto Focus Auto Iris';
+    }
+    else if (command_code == 0xC7) {
+        var additional_command = ad_command_buffer[2];
+        var preset = ad_command_buffer[3];
+        if (additional_command == 0x01) msg_string += 'Set Preset ' + preset;
+        if (additional_command == 0x02) msg_string += 'Goto Preset ' + preset;
+    }
     else if (command_code >= 0xE0 && command_code <= 0xEF) {
         msg_string += 'Controlling Output Pins 0x' + this.DecToHexPad(command_code & 0x0F,1)
     }
@@ -985,135 +995,6 @@ command_code;
     console.log(this.bytes_to_string(ad_command_buffer,length) + ' ' + msg_string);
 
     return;
-
-    if (op_code == 0x03) {
-        msg_string += 'Fixed Speed PTZ for a specified period';
-    }
-    else if (op_code == 0x04) {
-        msg_string += 'Repetitive Fixed Speed PTZ';
-    }
-    else if (op_code == 0x05) {
-        msg_string += 'Start/Stop Variable Speed PTZ = ';
-        // 3 data bytes used with this Op Code
-        var data_1 = bosch_command_buffer[4];
-        var data_2 = bosch_command_buffer[5];
-        var data_3 = bosch_command_buffer[6];
-        var zoom_speed = (data_1 >> 4) & 0x07;
-        var tilt_speed = (data_1 >> 0) & 0x0F;
-        var pan_speed  = (data_2 >> 3) & 0x0F;
-        var iris_open  = (data_2 >> 2) & 0x01;
-        var iris_close = (data_2 >> 1) & 0x01;
-        var focus_far  = (data_2 >> 0) & 0x01;
-        var focus_near = (data_3 >> 6) & 0x01;
-        var zoom_in    = (data_3 >> 5) & 0x01;
-        var zoom_out   = (data_3 >> 4) & 0x01;
-        var up    = (data_3 >> 3) & 0x01;
-        var down  = (data_3 >> 2) & 0x01;
-        var left  = (data_3 >> 1) & 0x01;
-        var right = (data_3 >> 0) & 0x01;
-
-
-        if (left === 0 && right === 0) {
-            msg_string += '[pan stop     ]';
-        } else if (left === 1 && right === 0) {
-            msg_string += '[PAN LEFT ('+pan_speed+')]';
-        } else if (left === 0 && right === 1) {
-            msg_string += '[PAN RIGHT('+pan_speed+')]';
-        } else { // left === 1 && right === 1)
-            msg_string += '[PAN ???? ('+pan_speed+')]';
-        }
-
-        if (up === 0 && down === 0) {
-            msg_string += '[tilt stop    ]';
-        } else if (up === 1 && down === 0) {
-            msg_string += '[TILT UP  ('+tilt_speed+')]';
-        } else if (up === 0 && down === 1) {
-            msg_string += '[TILT DOWN('+tilt_speed+')]';
-        } else { // (up === 1 && down === 1)
-            msg_string += '[TILT ????('+tilt_speed+')]';
-        }
-
-        if (zoom_in === 0 && zoom_out === 0) {
-            msg_string += '[zoom stop]';
-        } else if (zoom_in === 1 && zoom_out === 0) {
-            msg_string += '[ZOOM IN('+zoom_speed+')]';
-        } else if (zoom_in === 0 && zoom_out === 1) {
-            msg_string += '[ZOOM OUT('+zoom_speed+')]';
-        } else { // (zoom_in === 1 && zoom_out === 1)
-            msg_string += '[ZOOM ????]';
-        }
-
-        if (iris_open === 0 && iris_close === 0) {
-            msg_string += '[iris stop ]';
-        } else if (iris_open === 1 && iris_close === 0) {
-            msg_string += '[IRIS OPEN ]';
-        } else if (iris_open === 0 && iris_close === 1) {
-            msg_string += '[IRIS CLOSE]';
-        } else { // (iris_open === 1 && iris_close === 1)
-            msg_string += '[IRIS ???? ]';
-        }
-
-        if (focus_near === 0 && focus_far === 0) {
-            msg_string += '[focus stop]';
-        } else if (focus_near === 1 && focus_far === 0) {
-            msg_string += '[FOCUS NEAR]';
-        } else if (focus_near === 0 && focus_far === 1) {
-            msg_string += '[FOCUS FAR ]';
-        } else { // (focus_near === 1 && focus_far === 1)
-            msg_string += '[FOCUS ????]';
-        }
-    }
-    else if (op_code == 0x06) {
-        msg_string += 'Repetitive Fixed speed Zoom, Focus and Iris';
-    }
-    else if (op_code == 0x07) {
-        msg_string += 'Auxiliary On/Off and Preposition Set/Shot = ';
-        // 2 data bytes used with this Op Code
-        var data_1 = bosch_command_buffer[4];
-        var data_2 = bosch_command_buffer[5];
-        var function_code = data_1 & 0x0F;
-        var data = ((data_1 & 0x70)<< 3) + data_2;
-        if (function_code == 1) msg_string += 'Aux On ' + data;
-        else if (function_code == 2) msg_string += 'Aux Off ' + data;
-        else if (function_code == 4) msg_string += 'Pre-position SET ' + data;
-        else if (function_code == 5) msg_string += 'Pre-position SHOT ' + data;
-        else if (function_code == 8) msg_string += 'Cancel Latching Aux ' + data;
-        else if (function_code == 9) msg_string += 'Latching Aux On ' + data;
-        else if (function_code == 10) msg_string += 'Latching Aux Off ' + data;
-        else msg_string += 'unknown aux or pre-position command ' + function_code + ' with value ' + data;
-    }
-    else if (op_code == 0x08) {
-        msg_string += 'Repetitive Variable-speed PTZ, Focus and Iris';
-    }
-
-    //
-    // OSRD Extended Commands
-    //
-    else if (op_code == 0x09) {
-        msg_string += 'Fine Speed PTZ';
-    }
-    else if (op_code == 0x0A) {
-        msg_string += 'Position Report and Replay / Position Commands';
-    }
-    else if (op_code == 0x0C) {
-        msg_string += 'Ping Command';
-    }
-    else if (op_code == 0x0F) {
-        msg_string += 'Information Requested / Reply';
-    }
-    else if (op_code == 0x10) {
-        msg_string += 'Title set';
-    }
-    else if (op_code == 0x12) {
-        msg_string += 'Auxiliary Commands with Data';
-    }
-    else if (op_code == 0x13) {
-        msg_string += 'Set Position / Get Position';
-    }
-    else if (op_code == 0x14) {
-        msg_string += 'BiCom message';
-    }
-
 };
 
 
