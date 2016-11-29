@@ -21,7 +21,7 @@ var args = require('commander');
 
 // Command line arguments
 args.version(version);
-args.description('Pelco D, Pelco P, BBV422, Philips/Bosch, Vicon and Forward Vision parser');
+args.description('Pelco D, Pelco P, BBV422, Philips/Bosch, Vicon, Forward Vision and American Dynamics/Sensormatic parser');
 args.option('-l, --list','List serial ports');
 args.option('-v, --verbose','Verbose mode. Show all data bytes');
 args.option('-p, --port <name>','Serial Port eg COM1 or /dev/ttyUSB0');
@@ -32,7 +32,7 @@ args.parse(process.argv);
 // Initial message
 console.log('');
 console.log('CCTV Telemetry Decoder');
-console.log('Pelco D, Pelco P, BBV, Bosch, Philips, Forward Vision, Vicon');
+console.log('Pelco D, Pelco P, BBV, Bosch, Philips, Forward Vision, Vicon, American Dynamics, Sensormatic');
 console.log('(c) Roger Hardiman 2016 www.rjh.org.uk');
 console.log('Use -h for help');
 console.log('');

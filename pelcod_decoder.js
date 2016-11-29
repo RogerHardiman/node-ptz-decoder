@@ -1,5 +1,5 @@
 /*
- * Read and decode Pelco D, Pelco P, BBV422, Bosch/Philips, Forward Vision and Vicon CCTV commands
+ * Read and decode Pelco D, Pelco P, BBV422, Bosch/Philips, Forward Vision, Vicon, American Dynamics/Sensormatic CCTV commands
  * This code is not designed to decode every command.
  * The purpose is to monitor the output from various CCTV systems to confirm the protocols and camera addresses in use.
  * The meanings of certain Aux signals and special Preset values is not shown
@@ -44,6 +44,13 @@ function PelcoD_Decoder() {
 
     // Number of bytes in the current Buffer
     this.vicon_command_index = 0;
+
+    // A Buffer used for American Dynamics/Sensormatic (variable length message)
+    this.ad_command_buffer = new Buffer(128);
+
+    // Number of bytes in the current Buffer
+    this.ad_command_index = 0;
+
 }
 
 
@@ -124,6 +131,30 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
         }
 
 
+        // Add to American Dynamics byte buffer accumulating bytes
+        // AD422 starts with an address (0x01 to 0x63) followed by a command (0x81 to 0xFA)
+        // Ensure first 2 bytes meet this criteria
+        if (this.ad_command_index == 0 && new_byte>=0x01 && new_byte <=0x63) {
+            // Add the new_byte to the end of the ad_command_buffer
+            this.ad_command_buffer[this.ad_command_index] = new_byte;
+            this.ad_command_index++;
+        }
+        else if (this.ad_command_index == 1 && new_byte >= 0x81 && new_byte <= 0xFA) {
+            // Add the new_byte to the end of the ad_command_buffer
+            this.ad_command_buffer[this.ad_command_index] = new_byte;
+            this.ad_command_index++;
+        }
+        else if (this.ad_command_index > 1 && this.ad_command_index < this.ad_message_length(this.ad_command_buffer[1])) {
+            // Add the new_byte to the end of the ad_command_buffer
+            this.ad_command_buffer[this.ad_command_index] = new_byte;
+            this.ad_command_index++;
+        } else {
+            // We have not met the critera. Reset the buffer
+            this.ad_command_index = 0;
+        }
+
+
+
 
 
         // Pelco D Test. Check if we have 7 bytes with byte 0 = 0xFF and with a valid SUM checksum
@@ -186,6 +217,24 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             this.vicon_command_index = 0; // empty the buffer
         }
 
+
+        // American Dynamics AD422 / Sensormatic
+        // First Byte = Address 0x01 to 0x63
+        // Second Byte = Command 0x81 to 0xFA
+        // Then a variable length payload (zero, 1, 2 or more bytes)
+        // Then a Checksum
+        // This code does not handle the SET TEXT and NETWORK POSITION commands
+        if ((this.ad_command_buffer[0] >= 0x01 && this.ad_command_buffer[0] <= 0x63)
+                                             && (this.ad_command_buffer[1] >= 0x81 && this.ad_command_buffer[1] <= 0xFA)
+                                             && (this.ad_command_index == this.ad_message_length(this.ad_command_buffer[1]))
+                                             && (this.checksum_ad_valid(this.ad_command_buffer, this.ad_command_index))) {
+            // Looks like we have an American Dynamics AD422 / Sensormatic command. Try and process it
+            this.decode_ad422(this.ad_command_buffer);
+            this.ad_command_index = 0; // empty the buffer
+        }
+
+
+
     }
 };
 
@@ -244,6 +293,12 @@ PelcoD_Decoder.prototype.checksum_fv_valid = function(buffer,message_length) {
         return false;
     }
 };
+
+
+PelcoD_Decoder.prototype.checksum_ad_valid = function(buffer,message_length) {
+    return true;
+};
+
 
 
 PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
@@ -691,7 +746,7 @@ PelcoD_Decoder.prototype.decode_forward_vision = function(fv_command_buffer,fv_c
         msg_string += 'Store Preset ' + preset;
     }
     else {
-        msg_string += 'Unknown Command Code ' + control_code_char;
+        msg_string += 'Unknown Command Code' + control_code_char;
     }
 
 
@@ -790,6 +845,275 @@ PelcoD_Decoder.prototype.decode_vicon = function(vicon_command_buffer,vicon_comm
         }
 
         console.log(this.bytes_to_string(vicon_command_buffer,vicon_command_length) + ' ' + msg_string);
+};
+
+
+
+
+
+// Returns the length of a command (as this protocol uses variable length messages)
+PelcoD_Decoder.prototype.ad_message_length = function(command,command2) {
+    if (command == 0xA6) return 13; // Goto Abs Position
+    if (command == 0xC0) return 5; // Proportional Speed
+    if (command == 0xC4) return 6; // Get Config
+    if (command == 0xC7) return 5; // Set and Goto Preset
+    if (command == 0xCC) return 4; // Various config commands
+    if (command == 0xCD) return 5; // QuickSet
+    if (command == 0xDE) return 0; // Variable Lenth ASCII message. 5th Byte tells us ASCII string length
+    if (command == 0xFA) return 0; // Variable Lenth Network Position Command. 3rd Byte contains message length
+    return 3;  // all other commands a 3 bytes long (address, command, checksum)
+};
+
+PelcoD_Decoder.prototype.decode_ad422 = function(ad_command_buffer) {
+
+    var msg_string ='';
+
+    msg_string += 'AD/Sens ';
+
+    var camera_id = ad_command_buffer[0];
+    var command_code = ad_command_buffer[1];
+    var length = this.ad_message_length(command_code);
+
+    msg_string += 'Camera ' + camera_id + ' ';
+    
+    if (command_code == 0x81) {
+        msg_string += 'Pan Left';
+    }
+    else if (command_code == 0x82) {
+        msg_string += 'Pan Right';
+    }
+    else if (command_code == 0x83) {
+        msg_string += 'Pan Stop';
+    }
+    else if (command_code == 0x84) {
+        msg_string += 'Tilt Up';
+    }
+    else if (command_code == 0x85) {
+        msg_string += 'Tilt Down';
+    }
+    else if (command_code == 0x86) {
+        msg_string += 'Tilt Stop';
+    }
+    else if (command_code == 0x87) {
+        msg_string += 'Focus Near';
+    }
+    else if (command_code == 0x88) {
+        msg_string += 'Focus Far';
+    }
+    else if (command_code == 0x89) {
+        msg_string += 'Focus Stop';
+    }
+    else if (command_code == 0x8A) {
+        msg_string += 'Zoom In';
+    }
+    else if (command_code == 0x8B) {
+        msg_string += 'Zoom Out';
+    }
+    else if (command_code == 0x8C) {
+        msg_string += 'Zoom Stop';
+    }
+    else if (command_code == 0x90) {
+        msg_string += 'Iris Open';
+    }
+    else if (command_code == 0x91) {
+        msg_string += 'Iris Close';
+    }
+    else if (command_code == 0x92) {
+        msg_string += 'Iris Stop';
+    }
+    else if (command_code == 0x93) {
+        msg_string += 'All Stop';
+    }
+    else if (command_code == 0xA8) {
+        msg_string += 'Store Target 1';
+    }
+    else if (command_code == 0xA9) {
+        msg_string += 'Store Target 2';
+    }
+    else if (command_code == 0xAA) {
+        msg_string += 'Store Target 3';
+    }
+    else if (command_code == 0xAB) {
+        msg_string += 'Store Target 4';
+    }
+    else if (command_code == 0xB4) {
+        msg_string += 'Goto Target 1';
+    }
+    else if (command_code == 0xB5) {
+        msg_string += 'Goto Target 2';
+    }
+    else if (command_code == 0xB6) {
+        msg_string += 'Goto Target 3';
+    }
+    else if (command_code == 0xB7) {
+        msg_string += 'Goto Target 4';
+    }
+    else if (command_code == 0xB9) {
+        msg_string += 'Store Target 5';
+    }
+    else if (command_code == 0xBA) {
+        msg_string += 'Store Target 6';
+    }
+    else if (command_code == 0xBB) {
+        msg_string += 'Store Target 7';
+    }
+    else if (command_code == 0xBC) {
+        msg_string += 'Goto Target 5';
+    }
+    else if (command_code == 0xBD) {
+        msg_string += 'Goto Target 6';
+    }
+    else if (command_code == 0xBE) {
+        msg_string += 'Goto Target 7';
+    }
+    else if (command_code == 0xC0) {
+        var direction = ad_command_buffer[2];
+        var speed = ad_command_buffer[3];
+        if (direction == 0x81) msg_string += 'Pan Left (' + speed + ')';
+        else if (direction == 0x82) msg_string += 'Pan Right (' + speed + ')';
+        else if (direction == 0x84) msg_string += 'Tilt Up (' + speed + ')';
+        else if (direction == 0x85) msg_string += 'Tilt Down (' + speed + ')';
+    }
+    else if (command_code >= 0xE0 && command_code <= 0xEF) {
+        msg_string += 'Controlling Output Pins 0x' + this.DecToHexPad(command_code & 0x0F,1)
+    }
+    else {
+        msg_string += 'Unknown Command Code 0x' + this.DecToHexPad(command_code,2);
+command_code;
+    }
+
+    console.log(this.bytes_to_string(ad_command_buffer,length) + ' ' + msg_string);
+
+    return;
+
+    if (op_code == 0x03) {
+        msg_string += 'Fixed Speed PTZ for a specified period';
+    }
+    else if (op_code == 0x04) {
+        msg_string += 'Repetitive Fixed Speed PTZ';
+    }
+    else if (op_code == 0x05) {
+        msg_string += 'Start/Stop Variable Speed PTZ = ';
+        // 3 data bytes used with this Op Code
+        var data_1 = bosch_command_buffer[4];
+        var data_2 = bosch_command_buffer[5];
+        var data_3 = bosch_command_buffer[6];
+        var zoom_speed = (data_1 >> 4) & 0x07;
+        var tilt_speed = (data_1 >> 0) & 0x0F;
+        var pan_speed  = (data_2 >> 3) & 0x0F;
+        var iris_open  = (data_2 >> 2) & 0x01;
+        var iris_close = (data_2 >> 1) & 0x01;
+        var focus_far  = (data_2 >> 0) & 0x01;
+        var focus_near = (data_3 >> 6) & 0x01;
+        var zoom_in    = (data_3 >> 5) & 0x01;
+        var zoom_out   = (data_3 >> 4) & 0x01;
+        var up    = (data_3 >> 3) & 0x01;
+        var down  = (data_3 >> 2) & 0x01;
+        var left  = (data_3 >> 1) & 0x01;
+        var right = (data_3 >> 0) & 0x01;
+
+
+        if (left === 0 && right === 0) {
+            msg_string += '[pan stop     ]';
+        } else if (left === 1 && right === 0) {
+            msg_string += '[PAN LEFT ('+pan_speed+')]';
+        } else if (left === 0 && right === 1) {
+            msg_string += '[PAN RIGHT('+pan_speed+')]';
+        } else { // left === 1 && right === 1)
+            msg_string += '[PAN ???? ('+pan_speed+')]';
+        }
+
+        if (up === 0 && down === 0) {
+            msg_string += '[tilt stop    ]';
+        } else if (up === 1 && down === 0) {
+            msg_string += '[TILT UP  ('+tilt_speed+')]';
+        } else if (up === 0 && down === 1) {
+            msg_string += '[TILT DOWN('+tilt_speed+')]';
+        } else { // (up === 1 && down === 1)
+            msg_string += '[TILT ????('+tilt_speed+')]';
+        }
+
+        if (zoom_in === 0 && zoom_out === 0) {
+            msg_string += '[zoom stop]';
+        } else if (zoom_in === 1 && zoom_out === 0) {
+            msg_string += '[ZOOM IN('+zoom_speed+')]';
+        } else if (zoom_in === 0 && zoom_out === 1) {
+            msg_string += '[ZOOM OUT('+zoom_speed+')]';
+        } else { // (zoom_in === 1 && zoom_out === 1)
+            msg_string += '[ZOOM ????]';
+        }
+
+        if (iris_open === 0 && iris_close === 0) {
+            msg_string += '[iris stop ]';
+        } else if (iris_open === 1 && iris_close === 0) {
+            msg_string += '[IRIS OPEN ]';
+        } else if (iris_open === 0 && iris_close === 1) {
+            msg_string += '[IRIS CLOSE]';
+        } else { // (iris_open === 1 && iris_close === 1)
+            msg_string += '[IRIS ???? ]';
+        }
+
+        if (focus_near === 0 && focus_far === 0) {
+            msg_string += '[focus stop]';
+        } else if (focus_near === 1 && focus_far === 0) {
+            msg_string += '[FOCUS NEAR]';
+        } else if (focus_near === 0 && focus_far === 1) {
+            msg_string += '[FOCUS FAR ]';
+        } else { // (focus_near === 1 && focus_far === 1)
+            msg_string += '[FOCUS ????]';
+        }
+    }
+    else if (op_code == 0x06) {
+        msg_string += 'Repetitive Fixed speed Zoom, Focus and Iris';
+    }
+    else if (op_code == 0x07) {
+        msg_string += 'Auxiliary On/Off and Preposition Set/Shot = ';
+        // 2 data bytes used with this Op Code
+        var data_1 = bosch_command_buffer[4];
+        var data_2 = bosch_command_buffer[5];
+        var function_code = data_1 & 0x0F;
+        var data = ((data_1 & 0x70)<< 3) + data_2;
+        if (function_code == 1) msg_string += 'Aux On ' + data;
+        else if (function_code == 2) msg_string += 'Aux Off ' + data;
+        else if (function_code == 4) msg_string += 'Pre-position SET ' + data;
+        else if (function_code == 5) msg_string += 'Pre-position SHOT ' + data;
+        else if (function_code == 8) msg_string += 'Cancel Latching Aux ' + data;
+        else if (function_code == 9) msg_string += 'Latching Aux On ' + data;
+        else if (function_code == 10) msg_string += 'Latching Aux Off ' + data;
+        else msg_string += 'unknown aux or pre-position command ' + function_code + ' with value ' + data;
+    }
+    else if (op_code == 0x08) {
+        msg_string += 'Repetitive Variable-speed PTZ, Focus and Iris';
+    }
+
+    //
+    // OSRD Extended Commands
+    //
+    else if (op_code == 0x09) {
+        msg_string += 'Fine Speed PTZ';
+    }
+    else if (op_code == 0x0A) {
+        msg_string += 'Position Report and Replay / Position Commands';
+    }
+    else if (op_code == 0x0C) {
+        msg_string += 'Ping Command';
+    }
+    else if (op_code == 0x0F) {
+        msg_string += 'Information Requested / Reply';
+    }
+    else if (op_code == 0x10) {
+        msg_string += 'Title set';
+    }
+    else if (op_code == 0x12) {
+        msg_string += 'Auxiliary Commands with Data';
+    }
+    else if (op_code == 0x13) {
+        msg_string += 'Set Position / Get Position';
+    }
+    else if (op_code == 0x14) {
+        msg_string += 'BiCom message';
+    }
+
 };
 
 
