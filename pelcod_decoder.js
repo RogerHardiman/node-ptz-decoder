@@ -132,8 +132,10 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
 
 
         // Add to American Dynamics byte buffer accumulating bytes
-        // AD422 starts with an address (0x01 to 0x63) followed by a command (0x81 to 0xFA)
-        // Ensure first 2 bytes meet this criteria
+        // AD422 is minimum of 3 bytes.
+        // It starts with an address (1..99 [0x01..0x63] where 64[0x40] is for broadcast) followed by a command (0x81 to 0xFA)
+        // and then either the Checksum OR a variable length payload and Checksum
+        // Ensure first 2 bytes meet the range criteria
         if (this.ad_command_index == 0 && new_byte>=0x01 && new_byte <=0x63) {
             // Add the new_byte to the end of the ad_command_buffer
             this.ad_command_buffer[this.ad_command_index] = new_byte;
@@ -144,7 +146,12 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             this.ad_command_buffer[this.ad_command_index] = new_byte;
             this.ad_command_index++;
         }
-        else if (this.ad_command_index > 1 && this.ad_command_index < this.ad_message_length(this.ad_command_buffer[1])) {
+        else if (this.ad_command_index == 2) {
+            // Add the new_byte to the end of the ad_command_buffer
+            this.ad_command_buffer[this.ad_command_index] = new_byte;
+            this.ad_command_index++;
+        }
+        else if (this.ad_command_index > 2 && this.ad_command_index < this.ad_message_length(this.ad_command_buffer[1],this.ad_command_buffer[2])) {
             // Add the new_byte to the end of the ad_command_buffer
             this.ad_command_buffer[this.ad_command_index] = new_byte;
             this.ad_command_index++;
@@ -221,12 +228,12 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
         // American Dynamics AD422 / Sensormatic
         // First Byte = Address 0x01 to 0x63
         // Second Byte = Command 0x81 to 0xFA
+        // Third Byte = Checksum OR a Payload and Checksum
         // Then a variable length payload (zero, 1, 2 or more bytes)
-        // Then a Checksum
-        // This code does not handle the SET TEXT and NETWORK POSITION commands
+        // This code does not handle the 0xDE SET TEXT command as the payload size is in the 5th byte
         if ((this.ad_command_buffer[0] >= 0x01 && this.ad_command_buffer[0] <= 0x63)
                                              && (this.ad_command_buffer[1] >= 0x81 && this.ad_command_buffer[1] <= 0xFA)
-                                             && (this.ad_command_index == this.ad_message_length(this.ad_command_buffer[1]))
+                                             && (this.ad_command_index == this.ad_message_length(this.ad_command_buffer[1],this.ad_command_buffer[2]))
                                              && (this.checksum_ad_valid(this.ad_command_buffer, this.ad_command_index))) {
             // Looks like we have an American Dynamics AD422 / Sensormatic command. Try and process it
             this.decode_ad422(this.ad_command_buffer);
@@ -296,7 +303,17 @@ PelcoD_Decoder.prototype.checksum_fv_valid = function(buffer,message_length) {
 
 
 PelcoD_Decoder.prototype.checksum_ad_valid = function(buffer,message_length) {
-    return true;
+    var total = 0;
+    for (var x = 0; x < (message_length - 1); x++) {
+        total += buffer[x];
+    }
+    var computed_checksum = (0 - total) & 0xFF;
+    // Check if computed_checksum matches the last byte in the buffer
+    if (computed_checksum === buffer[message_length - 1]) {
+        return true;
+    } else {
+        return false;
+    }
 };
 
 
@@ -852,16 +869,19 @@ PelcoD_Decoder.prototype.decode_vicon = function(vicon_command_buffer,vicon_comm
 
 
 // Returns the length of a command (as this protocol uses variable length messages)
-PelcoD_Decoder.prototype.ad_message_length = function(command,command2) {
+PelcoD_Decoder.prototype.ad_message_length = function(command,byte3) { // ,byte4,byte5) {
     if (command == 0xA6) return 13; // Goto Abs Position
     if (command == 0xC0) return 5; // Proportional Speed
     if (command == 0xC4) return 6; // Get Config
     if (command == 0xC7) return 5; // Set and Goto Preset
     if (command == 0xCC) return 4; // Various config commands
     if (command == 0xCD) return 5; // QuickSet
-    if (command == 0xDE) return 0; // Variable Lenth ASCII message. 5th Byte tells us ASCII string length
-    if (command == 0xFA) return 0; // Variable Lenth Network Position Command. 3rd Byte contains message length
-    return 3;  // all other commands a 3 bytes long (address, command, checksum)
+    if (command == 0xDE) return 0; // Variable Length ASCII message. 5th Byte tells us ASCII string length
+    // Check for 0xFA 'get' command has bit 7 clear. Goes not use command length bits
+    if (command == 0xFA && (byte3>>7 == 0)) return 4 + 1; // Variable Length Network Position Command. 4 bytes plus checsksum
+    // Check for 0xFA 'set' command has bit 7 set. Obey command length bits
+    if (command == 0xFA && (byte3>>7 == 1)) return (byte3 & 0x1F) + 1; // Variable Length Network Position Command plus checsksum
+    return 3;  // all other commands are 3 bytes long (address, command, checksum)
 };
 
 PelcoD_Decoder.prototype.decode_ad422 = function(ad_command_buffer) {
@@ -872,7 +892,7 @@ PelcoD_Decoder.prototype.decode_ad422 = function(ad_command_buffer) {
 
     var camera_id = ad_command_buffer[0];
     var command_code = ad_command_buffer[1];
-    var length = this.ad_message_length(command_code);
+    var length = this.ad_message_length(ad_command_buffer[1],ad_command_buffer[2]);
 
     msg_string += 'Camera ' + camera_id + ' ';
     
@@ -924,6 +944,15 @@ PelcoD_Decoder.prototype.decode_ad422 = function(ad_command_buffer) {
     else if (command_code == 0x93) {
         msg_string += 'All Stop';
     }
+    else if (command_code == 0x98) {
+        msg_string += 'Suspend replies from camera';
+    }
+    else if (command_code == 0x99) {
+        msg_string += 'Resume replies from camera';
+    }
+    else if (command_code == 0xA5) {
+        msg_string += 'Request Position';
+    }
     else if (command_code == 0xA8) {
         msg_string += 'Store Target 1';
     }
@@ -974,6 +1003,9 @@ PelcoD_Decoder.prototype.decode_ad422 = function(ad_command_buffer) {
         else if (direction == 0x84) msg_string += 'Tilt Up (' + speed + ')';
         else if (direction == 0x85) msg_string += 'Tilt Down (' + speed + ')';
     }
+    else if (command_code == 0xC4) {
+        msg_string += 'Get Configuration Buffer';
+    }
     else if (command_code == 0xCC) {
         var additional_command = ad_command_buffer[2];
         if (additional_command == 0x08) msg_string += 'Auto Focus Auto Iris';
@@ -986,6 +1018,36 @@ PelcoD_Decoder.prototype.decode_ad422 = function(ad_command_buffer) {
     }
     else if (command_code >= 0xE0 && command_code <= 0xEF) {
         msg_string += 'Controlling Output Pins 0x' + this.DecToHexPad(command_code & 0x0F,1)
+    }
+    else if (command_code == 0xFA) {
+        var cmd_bit7 = (ad_command_buffer[2] >> 7) & 0x01; // get/set
+        var cmd_bit5 = (ad_command_buffer[2] >> 5) & 0x01; // abs/rel
+        var units_bit6 = (ad_command_buffer[3] >> 6) & 0x01; // auto focus
+        var units_bit7 = (ad_command_buffer[3] >> 7) & 0x01; // auto iris
+        if (cmd_bit7 == 0 && cmd_bit5 == 0) {
+            msg_string += 'Get Absolute Position';
+        }
+        if (cmd_bit7 == 0 && cmd_bit5 == 1) {
+            msg_string += 'Get Relative Position';
+        }
+        if (cmd_bit7 == 1 && cmd_bit5 == 0) {
+            msg_string += 'Set Absolute Position';
+        }
+        if (cmd_bit7 == 1 && cmd_bit5 == 1) {
+            msg_string += 'Set Relative Position';
+        }
+        if (cmd_bit7 == 1 && units_bit6 == 0) {
+            msg_string += ' AutoFocus=Off';
+        }
+        if (cmd_bit7 == 1 && units_bit6 == 1) {
+            msg_string += ' AutoFocus=On';
+        }
+        if (cmd_bit7 == 1 && units_bit7 == 0) {
+            msg_string += ' AutoIris=Off';
+        }
+        if (cmd_bit7 == 1 && units_bit7 == 1) {
+            msg_string += ' AutoIris=On';
+        }
     }
     else {
         msg_string += 'Unknown Command Code 0x' + this.DecToHexPad(command_code,2);
