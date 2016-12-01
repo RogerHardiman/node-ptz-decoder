@@ -382,6 +382,8 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
             msg_string += '[START TOUR ' + data_2 + ']';
         } else if (command_2 === 0x25 && command_1 === 0x00 && data_1 === 0x00) {
             msg_string += '[SET ZOOM SPEED ' + data_2 + ']';
+        } else if (command_2 === 0x27 && command_1 === 0x00 && data_1 === 0x00) {
+            msg_string += '[SET FOCUS SPEED ' + data_2 + ']';
         } else if (command_2 === 0x2B && command_1 === 0x00 && data_1 === 0x00 && data_2 == 0x00) {
             msg_string += '[AUTO FOCUS SET TO AUTOMATIC]';
         } else if (command_2 === 0x2B && command_1 === 0x00 && data_1 === 0x00 && data_2 != 0x00) {
