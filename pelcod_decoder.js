@@ -382,8 +382,24 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
             msg_string += '[START TOUR ' + data_2 + ']';
         } else if (command_2 === 0x25 && command_1 === 0x00 && data_1 === 0x00) {
             msg_string += '[SET ZOOM SPEED ' + data_2 + ']';
+        } else if (command_2 === 0x2B && command_1 === 0x00 && data_1 === 0x00 && data_2 == 0x00) {
+            msg_string += '[AUTO FOCUS SET TO AUTOMATIC]';
+        } else if (command_2 === 0x2B && command_1 === 0x00 && data_1 === 0x00 && data_2 != 0x00) {
+            // 2012 spec says 0 = Automatic Operation. 1 = Auto Focus Off
+            // 1999 spec says range 0..2  Automatic,On,Off
+            msg_string += '[AUTO FOCUS SETTING ' + data_2 + ']';
+        } else if (command_2 === 0x2D && command_1 === 0x00 && data_1 === 0x00 && data_2 == 0x00) {
+            msg_string += '[AUTO IRIS SET TO AUTOMATIC]';
+        } else if (command_2 === 0x2D && command_1 === 0x00 && data_1 === 0x00 && data_2 != 0x00) {
+            // 2012 spec says 0 = Automatic Operation. 1 = Auto Iris Off
+            // 1999 spec says range 0..2  Automatic,On,Off
+            msg_string += '[AUTO IRIS SETTING ' + data_2 + ']';
+        } else if (command_2 === 0x31 && command_1 === 0x00 && data_1 === 0x00 && data_2 == 0x01) {
+            msg_string += '[BACKLIGHT COMPENSATION OFF]';
+        } else if (command_2 === 0x31 && command_1 === 0x00 && data_1 === 0x00 && data_2 == 0x02) {
+            msg_string += '[BACKLIGHT COMPENSATION ON]';
         } else {
-            msg_string += 'Unknown extended command';
+            msg_string += 'Unknown extended command 0x' + this.DecToHexPad(command_2, 2);
         }
     } else {
         // Process a normal Pan, Tilt, Zoom, Focus and Iris command
