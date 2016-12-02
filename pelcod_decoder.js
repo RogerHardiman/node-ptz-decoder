@@ -51,6 +51,12 @@ function PelcoD_Decoder() {
     // Number of bytes in the current Buffer
     this.ad_command_index = 0;
 
+    // A Buffer used for Panasonic (variable length message)
+    this.panasonic_command_buffer = new Buffer(128);
+
+    // Number of bytes in the current Buffer
+    this.panasonic_command_index = 0;
+
 }
 
 
@@ -160,8 +166,18 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             this.ad_command_index = 0;
         }
 
-
-
+        // Add to Panasonic byte buffer accumulating bytes
+        // It starts with 0x02 (STX) and ends with 0x03 (ETX)
+        // The rest of the data bytes are ASCII character bytes (0..9, A-Z etc)
+        if (new_byte == 0x02) {
+            // Always starts with 0x02 (STX)
+            this.panasonic_command_index = 0;
+        }
+        if (this.panasonic_command_index < this.panasonic_command_buffer.length) {
+            // Add the new_byte to the end of the panasonic_command_buffer
+            this.panasonic_command_buffer[this.panasonic_command_index] = new_byte;
+            this.panasonic_command_index++;
+        }
 
 
         // Pelco D Test. Check if we have 7 bytes with byte 0 = 0xFF and with a valid SUM checksum
@@ -238,6 +254,16 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
             // Looks like we have an American Dynamics AD422 / Sensormatic command. Try and process it
             this.decode_ad422(this.ad_command_buffer);
             this.ad_command_index = 0; // empty the buffer
+        }
+
+	// Panasonic is STX (0x02) then payload and then ETX (0x03)
+        // The Payload is at least 11 bytes eg GC7:9034002 so the shortest message is 13 bytes
+        if ((this.panasonic_command_buffer[0] == 0x02)
+              && (this.panasonic_command_buffer[this.panasonic_command_index - 1] == 0x03)
+              && (this.panasonic_command_index >= 13)) {
+            // Looks like we have a Panasonic command. Try and process it
+            this.decode_panasonic(this.panasonic_command_buffer, this.panasonic_command_index);
+            this.panasonic_command_index = 0; // empty the buffer
         }
 
 
@@ -1087,6 +1113,18 @@ command_code;
     return;
 };
 
+PelcoD_Decoder.prototype.decode_panasonic = function(buffer,length) {
+
+    var msg_string = "";
+
+    msg_string += "Panasonic ";
+
+    for (var i = 1; i < length -1; i++) {
+        msg_string += String.fromCharCode(buffer[i]);
+    }
+    console.log(msg_string);
+    return;
+};
 
 
 PelcoD_Decoder.prototype.bytes_to_string = function(buffer, length) {
