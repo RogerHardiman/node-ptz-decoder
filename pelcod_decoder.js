@@ -787,6 +787,9 @@ PelcoD_Decoder.prototype.decode_forward_vision = function(fv_command_buffer,fv_c
         var data1 = this.fv_hex_ascii(fv_command_buffer[7], fv_command_buffer[8]);
         msg_string += 'Reset Value=' + data1;
     }
+    else if (control_code_char === 'Y') {
+        msg_string += 'Get SW Version';
+    }
     else {
         msg_string += 'Unknown Command Code ' + control_code_char;
     }
