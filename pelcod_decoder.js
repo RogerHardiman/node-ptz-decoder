@@ -780,8 +780,15 @@ PelcoD_Decoder.prototype.decode_forward_vision = function(fv_command_buffer,fv_c
 
         msg_string += 'Store Preset ' + preset;
     }
+    else if (control_code_char === 'O') {
+        msg_string += 'Get Current Position';
+    }
+    else if (control_code_char === 'W') {
+        var data1 = this.fv_hex_ascii(fv_command_buffer[7], fv_command_buffer[8]);
+        msg_string += 'Reset Value=' + data1;
+    }
     else {
-        msg_string += 'Unknown Command Code' + control_code_char;
+        msg_string += 'Unknown Command Code ' + control_code_char;
     }
 
 
