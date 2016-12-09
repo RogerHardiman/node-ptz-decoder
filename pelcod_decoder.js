@@ -794,6 +794,7 @@ PelcoD_Decoder.prototype.decode_forward_vision = function(fv_command_buffer,fv_c
         msg_string += ' Wipe='+wiper_off_on;
         msg_string += ' Wash='+washer_off_on;
         msg_string += ' Lamp='+lamp_control;
+	msg_string += ' PropZoom='+pan_tilt_scale_off_on;
         
     }
     else if (control_code_char === 'L') {
