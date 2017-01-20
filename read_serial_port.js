@@ -16,6 +16,12 @@
 // External Dependencies
 var SerialPort = require('serialport');
 var PelcoD_Decoder = require('./pelcod_decoder');
+try {
+var Extra_Decoder_1 = require('./extra_decoder_1');
+} catch (err) {
+// ignore this optional extra decoder
+}
+
 var version = require('./package.json').version;
 var args = require('commander');
 
@@ -71,7 +77,8 @@ if (args.baud) baud_rate = args.baud;
 if (args.parity === 'none' || args.parity === 'odd' || args.parity === 'even') parity = args.parity;
 
 // Open Serial Port.
-var pelco_d_decoder = new PelcoD_Decoder();
+if (PelcoD_Decoder)  var pelco_d_decoder = new PelcoD_Decoder();
+if (Extra_Decoder_1) var extra_decoder_1 = new Extra_Decoder_1();
 var port = new SerialPort(serial_port, {
     baudrate: baud_rate,
     parity: parity,
@@ -98,8 +105,10 @@ port.on('open', function(err) {
 
 // Callback - Data
 port.on('data', function(buffer) {
-    if (args.verbose) console.log(BufferToHexString(buffer));
-    pelco_d_decoder.processBuffer(buffer);
+    if (args.verbose) process.stdout.write(BufferToHexString(buffer));
+    // pass to each decoder
+    if (pelco_d_decoder) pelco_d_decoder.processBuffer(buffer);
+    if (extra_decoder_1) extra_decoder_1.processBuffer(buffer);
 });
 
 // Callback - Disconnected (eg USB removal) 
@@ -109,6 +118,7 @@ port.on('disconnect', function(err) {
 });
 
 // helper functions
+var last_byte = '';
 function BufferToHexString(buffer) {
     var byte_string = '';
     for (var i = 0; i < buffer.length; i++) {
