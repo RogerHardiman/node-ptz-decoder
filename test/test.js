@@ -1,7 +1,14 @@
 // Mocha tests
 
 var expect    = require("chai").expect;
-var PelcoD_Decoder = require("../pelcod_decoder.js");
+var PelcoD_Decoder = require("../pelcod_decoder.js").PelcoD_Decoder;
+
+var log_string = '';
+var pelcod_decoder = new PelcoD_Decoder();
+pelcod_decoder.on('log',function(msg) { 
+  console.log('>1>1' + msg);
+  log_string = msg;
+});
 
 function AppendStringToByteArray(str,bytes)
 {
@@ -17,7 +24,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Test Checksum", function() {
     it("tests checksum", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0xFF,0x42,0x42,0x42,0x42,0x42,0x42];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
@@ -26,49 +32,51 @@ describe("Pelco D Decoder", function() {
 
   describe("Test Cam 1 Pan Left", function() {
     it("tests Pan Left", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0xFF,0x01,0x00,0x04,0x20,0x00,0x25];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
+      expect(log_string).to.contain('PAN LEFT');
     });
   });
 
   describe("Test Cam 1 Pan Right", function() {
     it("tests Pan right", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0xFF,0x01,0x00,0x02,0x20,0x00,0x23];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
+      expect(log_string).to.contain('PAN RIGHT');
     });
   });
 
   describe("Test Cam 1 Up", function() {
     it("tests up", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var buf = new Buffer([0xFF,0x01,0x00,0x08,0x00,0x20,0x29]);
       pelcod_decoder.processBuffer(buf);
+      expect(log_string).to.contain('TILT UP');
     });
   });
 
   describe("Test Cam 1 Down", function() {
     it("tests down", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var buf = new Buffer([0xFF,0x01,0x00,0x10,0x00,0x20,0x31]);
       pelcod_decoder.processBuffer(buf);
+      expect(log_string).to.contain('Camera 1');
+      expect(log_string).to.contain('TILT DOWN');
     });
   });
 
   describe("Test Cam 1 Stop", function() {
     it("tests stop", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var buf = new Buffer([0xFF,0x01,0x00,0x00,0x00,0x00,0x01]);
       pelcod_decoder.processBuffer(buf);
+      expect(log_string).to.contain('Camera 1');
+      expect(log_string).to.contain('pan stop');
+      expect(log_string).to.contain('tilt stop');
     });
   });
 
   describe("Test Cam 1 Iris Open", function() {
     it("tests iris open", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var buf = new Buffer([0xFF,0x01,0x02,0x00,0x00,0x00,0x03]);
       pelcod_decoder.processBuffer(buf);
     });
@@ -76,7 +84,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Test Cam 1 Iris Close", function() {
     it("tests iris close", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var buf = new Buffer([0xFF,0x01,0x04,0x00,0x00,0x00,0x05]);
       pelcod_decoder.processBuffer(buf);
     });
@@ -85,7 +92,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Test Cam 1 Focus Near", function() {
     it("tests focus near", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var buf = new Buffer([0xFF,0x01,0x01,0x00,0x00,0x00,0x02]);
       pelcod_decoder.processBuffer(buf);
     });
@@ -93,7 +99,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Test Cam 1 Focus Far", function() {
     it("tests focus far", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var buf = new Buffer([0xFF,0x01,0x00,0x80,0x00,0x00,0x81]);
       pelcod_decoder.processBuffer(buf);
     });
@@ -101,7 +106,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Test Cam 1 Zoom in", function() {
     it("tests Zoom in", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var buf = new Buffer([0xFF,0x01,0x00,0x20,0x00,0x00,0x21]);
       pelcod_decoder.processBuffer(buf);
     });
@@ -109,7 +113,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Test Cam 1 Zoom Out", function() {
     it("tests Zoom Out", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var buf = new Buffer([0xFF,0x01,0x00,0x40,0x00,0x00,0x41]);
       pelcod_decoder.processBuffer(buf);
     });
@@ -117,26 +120,30 @@ describe("Pelco D Decoder", function() {
 
   describe("Test Extended Command Coverage", function() {
     it("tests extended commands", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       // Aux On
       var buf = new Buffer([0xFF,0x01,0x00,0x09,0x00,0x05,0x0F]);
       pelcod_decoder.processBuffer(buf);
+      expect(log_string).to.contain('SET AUX 5');
 
       // Aux Off
       var buf = new Buffer([0xFF,0x01,0x00,0x0B,0x00,0x05,0x11]);
       pelcod_decoder.processBuffer(buf);
+      expect(log_string).to.contain('CLEAR AUX 5');
 
       // Set Preset
       var buf = new Buffer([0xFF,0x01,0x00,0x03,0x00,0x01,0x05]);
       pelcod_decoder.processBuffer(buf);
+      expect(log_string).to.contain('SET PRESET 1');
 
       // Goto Preset
       var buf = new Buffer([0xFF,0x01,0x00,0x07,0x00,0x01,0x09]);
       pelcod_decoder.processBuffer(buf);
+      expect(log_string).to.contain('GOTO PRESET 1');
 
       // Clear Preset
       var buf = new Buffer([0xFF,0x01,0x00,0x05,0x00,0x01,0x07]);
       pelcod_decoder.processBuffer(buf);
+      expect(log_string).to.contain('CLEAR PRESET 1');
 
       // Learn Tour
       var buf = new Buffer([0xFF,0x01,0x00,0x1F,0x00,0x00,0x20]);
@@ -153,6 +160,7 @@ describe("Pelco D Decoder", function() {
       // Set Zoom Speed
       var buf = new Buffer([0xFF,0x01,0x00,0x25,0x00,0x03,0x29]);
       pelcod_decoder.processBuffer(buf);
+      expect(log_string).to.contain('SET ZOOM SPEED 3');
 
       // Unknown extended command (with valid checksum)
       var buf = new Buffer([0xFF,0x01,0x00,0x01,0x00,0x01,0x03]);
@@ -167,7 +175,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Test byte cache with split bytes (Pan Left)", function() {
     it("tests split command", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes1 = [0xFF,0x01,0x00,0x04];
       var bytes2 = [0x20,0x00,0x25];
       var buf1 = new Buffer(bytes1);
@@ -179,7 +186,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Test byte cache with Pan Left and Stop", function() {
     it("tests multiple commands", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0xFF,0x01,0x00,0x04,0x20,0x00,0x25,0xFF,0x01,0x00,0x00,0x00,0x00,0x01];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
@@ -188,7 +194,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Test byte cache with small amount of garbage then real command (stop)", function() {
     it("tests garbage then data", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0x01,0x02,0x03,0xFF,0x01,0x00,0x00,0x00,0x00,0x01];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
@@ -197,7 +202,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Test byte cache with large amount of garbage then real command (stop)", function() {
     it("tests garbage then data", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0x10,0x20,0x30,0x40,0x50,0x60,0x70,0x80,0x90,0xFF,0x01,0x00,0x00,0x00,0x00,0x01];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
@@ -206,7 +210,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Pelco P Test Pan Left", function() {
     it("tests Pan Left", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0xA0,0x00,0x00,0x04,0x20,0x00,0xAF,0x2B];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
@@ -215,7 +218,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Pelco P Test Pan Right", function() {
     it("tests Pan Right", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0xA0,0x00,0x00,0x02,0x20,0x00,0xAF,0x2D];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
@@ -224,7 +226,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Pelco P Test Tilt Up", function() {
     it("tests Tilt Up", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0xA0,0x00,0x00,0x08,0x00,0x20,0xAF,0x27];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
@@ -233,7 +234,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Pelco P Test Tilt Down", function() {
     it("tests Tilt Down", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0xA0,0x00,0x00,0x10,0x00,0x20,0xAF,0x3F];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
@@ -242,7 +242,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Pelco P Test Stop", function() {
     it("tests Stop", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0xA0,0x00,0x00,0x00,0x00,0x00,0xAF,0x0F];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
@@ -251,7 +250,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Pelco P bad checksum", function() {
     it("tests bad checksum", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0xA0,0x00,0x00,0x00,0xFF,0x00,0xAF,0x0F];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
@@ -260,7 +258,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Pelco P Test byte cache with small amount of garbage then real command (stop)", function() {
     it("tests garbage then data", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0x01,0x02,0x03,0xA0,0x00,0x00,0x00,0x00,0x00,0xAF,0x0F];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
@@ -269,7 +266,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Pelco P Test byte cache with large amount of garbage then real command (stop)", function() {
     it("tests garbage then data", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [0x10,0x20,0x30,0x40,0x50,0x60,0x70,0x80,0x90,0xA0,0x00,0x00,0x00,0x00,0x00,0xAF,0x0F];
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
@@ -278,7 +274,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Bosch Telemetry (Philips BiPhase) block of data", function() {
     it("tests garbage then data", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [
 0x00,0x00,0x00,
 0x86,0x00,0x23,0x07,0x02,0x01,0x33,
@@ -314,7 +309,6 @@ describe("Pelco D Decoder", function() {
 
   describe("Bosch Telemetry (Philips BiPhase) wipe", function() {
     it("tests Wipe commands", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [
 0x86,0x00,0x31,0x07,0x01,0x05,0x44,
 0x86,0x00,0x31,0x07,0x02,0x05,0x45
@@ -326,53 +320,71 @@ describe("Pelco D Decoder", function() {
 
   describe("Forward Vision Telemetry block of data", function() {
     it("tests garbage then data", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = []
-      bytes.push(0x01, 0x02, 0x03);
+      bytes.push(0x01, 0x02, 0x03); // garbage
 
       // Tilt up Dome 41
       bytes.push(0x0A);
       AppendStringToByteArray('29126G083200008E',bytes);
       bytes.push(0x87);
+      pelcod_decoder.processBuffer(bytes);
+      expect(log_string).to.contain('TILT UP');
 
       // Pan left at speed 50 on Dome 2
+      bytes = []
       bytes.push(0x0A);
       AppendStringToByteArray('02126G0230003200',bytes);
       bytes.push(0xFA);
+      pelcod_decoder.processBuffer(bytes);
+      expect(log_string).to.contain('PAN LEFT');
 
       // Pan right at speed 255 on Dome 2
+      bytes = [];
       bytes.push(0x0A);
       AppendStringToByteArray('02126G033000FF00',bytes);
       bytes.push(0xFA);
+      pelcod_decoder.processBuffer(bytes);
+      expect(log_string).to.contain('PAN RIGHT');
 
       // Stop on Dome 2
+      bytes = [];
       bytes.push(0x0A);
       AppendStringToByteArray('02126G0030000000',bytes);
       bytes.push(0xF9);
+      pelcod_decoder.processBuffer(bytes);
+      expect(log_string).to.contain('Camera 2');
+      expect(log_string).to.contain('tilt stop');
+      expect(log_string).to.contain('pan stop');
 
       // Zoom in on Dome 2
+      bytes = [];
       bytes.push(0x0A);
       AppendStringToByteArray('02126G2030000000',bytes);
       bytes.push(0xFB);
+      pelcod_decoder.processBuffer(bytes);
+      expect(log_string).to.contain('ZOOM IN');
 
       // Goto preset 7 on Dome 2
+      bytes = [];
       bytes.push(0x0A);
       AppendStringToByteArray('020A6L07',bytes);
       bytes.push(0x84);
+      pelcod_decoder.processBuffer(bytes);
+      expect(log_string).to.contain('Goto Preset 7');
 
       // Pan right at speed 255 on Dome address 6
+      bytes = [];
       bytes.push(0x0A);
       AppendStringToByteArray('06122G033000FF00',bytes);
       bytes.push(0xFA);
-
-      var buf = new Buffer(bytes);
-      pelcod_decoder.processBuffer(buf);
+      pelcod_decoder.processBuffer(bytes);
+      expect(log_string).to.contain('Camera 6');
+      expect(log_string).to.contain('PAN RIGHT(255)');
     });
   });
 
   describe("Vicon Telemetry block of data", function() {
     it("tests garbage then data", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [
 0x00,0x00,0x00,
 0x83,0x52,0x00,0x02,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -399,7 +411,6 @@ describe("Pelco D Decoder", function() {
 
   describe("American Dynamics / Sensormatic block of data", function() {
     it("tests garbage then AD422 data", function() {
-      var pelcod_decoder = new PelcoD_Decoder();
       var bytes = [
 0x07,0xC0,0x82,0x0A,0xAD, // 7 Pan Right
 0x07,0x83,0x76,           // 7 Stop

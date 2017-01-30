@@ -15,7 +15,7 @@
 
 // External Dependencies
 var SerialPort = require('serialport');
-var PelcoD_Decoder = require('./pelcod_decoder');
+var PelcoD_Decoder = require('./pelcod_decoder').PelcoD_Decoder;
 try {
 var Extra_Decoder_1 = require('./extra_decoder_1');
 } catch (err) {
@@ -99,7 +99,7 @@ port.on('open', function(err) {
     if (err) {
         console.log('Serial Port Error : ' + err);
     } else {
-        console.log('Serial Port ' + serial_port + ' open');
+        console.log('Serial Port ' + serial_port + ' open ' + baud_rate + '-' + parity + '-' + stop_bits);
     }
 });
 
@@ -116,6 +116,18 @@ port.on('disconnect', function(err) {
     console.log('Disconnected ' + err);
     process.exit(1);
 });
+
+// Callback - Dedoded protocol
+pelco_d_decoder.on('log', function(message) {
+    console.log(message);
+});
+
+if (extra_decoder_1) {
+  extra_decoder_1.on('log', function(message) {
+      console.log(message);
+  });
+}
+
 
 // helper functions
 var last_byte = '';

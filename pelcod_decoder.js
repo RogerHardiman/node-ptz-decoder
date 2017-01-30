@@ -11,7 +11,11 @@
  *
  */
 
-function PelcoD_Decoder() {
+var EventEmitter = require('events');
+
+class PelcoD_Decoder extends EventEmitter {
+  constructor() {
+    super();
 
     // A Buffer used to cache partial commands
     this.pelco_command_buffer = new Buffer(7);
@@ -60,9 +64,11 @@ function PelcoD_Decoder() {
 }
 
 
-PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
+// new_data_buffer can be a NodeJS Buffer or a Javascript array
+// as the only methods called are .length and the array index '[]' operator
+processBuffer(new_data_buffer) {
 
-    // console.log('received ' + this.bytes_to_string(new_data_buffer,new_data_buffer.length) );
+    // this.emit("log",'received ' + this.bytes_to_string(new_data_buffer,new_data_buffer.length) );
 
     // process each byte from new_data_buffer in turn
 
@@ -271,7 +277,7 @@ PelcoD_Decoder.prototype.processBuffer = function(new_data_buffer) {
     }
 };
 
-PelcoD_Decoder.prototype.checksum_valid = function(buffer) {
+checksum_valid(buffer) {
     var total = 0;
     // The 0xFF start byte is not included in the checksum
     for (var x = 1; x < (buffer.length - 1); x++) {
@@ -286,7 +292,7 @@ PelcoD_Decoder.prototype.checksum_valid = function(buffer) {
     }
 };
 
-PelcoD_Decoder.prototype.checksum_p_valid = function(buffer) {
+checksum_p_valid(buffer) {
     var computed_checksum = 0x00;
     for (var x = 0; x < (buffer.length - 1); x++) {
         computed_checksum = computed_checksum ^ buffer[x]; // xor
@@ -299,7 +305,7 @@ PelcoD_Decoder.prototype.checksum_p_valid = function(buffer) {
     }
 };
 
-PelcoD_Decoder.prototype.checksum_bosch_valid = function(buffer,message_length) {
+checksum_bosch_valid(buffer,message_length) {
     var total = 0;
     for (var x = 0; x < (message_length - 1); x++) {
         total += buffer[x];
@@ -313,7 +319,7 @@ PelcoD_Decoder.prototype.checksum_bosch_valid = function(buffer,message_length) 
     }
 };
 
-PelcoD_Decoder.prototype.checksum_fv_valid = function(buffer,message_length) {
+checksum_fv_valid(buffer,message_length) {
     var computed_checksum = 0x00;
     for (var x = 0; x < (message_length -1 ); x++) {
         computed_checksum = computed_checksum ^ buffer[x]; // xor
@@ -328,7 +334,7 @@ PelcoD_Decoder.prototype.checksum_fv_valid = function(buffer,message_length) {
 };
 
 
-PelcoD_Decoder.prototype.checksum_ad_valid = function(buffer,message_length) {
+checksum_ad_valid(buffer,message_length) {
     var total = 0;
     for (var x = 0; x < (message_length - 1); x++) {
         total += buffer[x];
@@ -344,7 +350,7 @@ PelcoD_Decoder.prototype.checksum_ad_valid = function(buffer,message_length) {
 
 
 
-PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
+decode(pelco_command_buffer) {
 
     var pelco_d = false;
     var pelco_p = false;
@@ -508,10 +514,10 @@ PelcoD_Decoder.prototype.decode = function(pelco_command_buffer) {
         }
 
     }
-    console.log(this.bytes_to_string(pelco_command_buffer, pelco_command_buffer.length) + ' ' + msg_string);
+    this.emit("log",this.bytes_to_string(pelco_command_buffer, pelco_command_buffer.length) + ' ' + msg_string);
 };
 
-PelcoD_Decoder.prototype.decode_bosch = function(bosch_command_buffer) {
+decode_bosch(bosch_command_buffer) {
 
     // Note Bosch is 9600 8-N-1
 
@@ -674,10 +680,10 @@ PelcoD_Decoder.prototype.decode_bosch = function(bosch_command_buffer) {
         msg_string += 'Unknown Op Code ' + op_code;
     }
 
-    console.log(this.bytes_to_string(bosch_command_buffer,length+1) + ' ' + msg_string);
+    this.emit("log",this.bytes_to_string(bosch_command_buffer,length+1) + ' ' + msg_string);
 };
 
-PelcoD_Decoder.prototype.fv_hex_ascii = function(byte_1,byte_2) {
+fv_hex_ascii(byte_1,byte_2) {
   // Byte 1 could be 0x31  = ASCII "1"
   // Byte 2 could be 0x46 = ASCII "F"
   // Convert Byte 1 and Byte 2 from 'bytes' into Chars, eg to "1" and "F"
@@ -690,7 +696,7 @@ PelcoD_Decoder.prototype.fv_hex_ascii = function(byte_1,byte_2) {
 }
 
 
-PelcoD_Decoder.prototype.decode_forward_vision = function(fv_command_buffer,fv_command_length) {
+decode_forward_vision(fv_command_buffer,fv_command_length) {
 
     // Note Forward Vision is 9600 8-O-1    *** ODD PARITY ***
 
@@ -822,11 +828,11 @@ PelcoD_Decoder.prototype.decode_forward_vision = function(fv_command_buffer,fv_c
     }
 
 
-    console.log(this.bytes_to_string(fv_command_buffer,fv_command_length) + ' ' + msg_string);
+    this.emit("log",this.bytes_to_string(fv_command_buffer,fv_command_length) + ' ' + msg_string);
 };
 
 
-PelcoD_Decoder.prototype.decode_vicon = function(vicon_command_buffer,vicon_command_length) {
+decode_vicon(vicon_command_buffer,vicon_command_length) {
 
     // Does not appear to be any checksum
     // Byte 1. MSB set to 1.
@@ -916,7 +922,7 @@ PelcoD_Decoder.prototype.decode_vicon = function(vicon_command_buffer,vicon_comm
             msg_string += '[Goto Preset '+ preset_value + ']';
         }
 
-        console.log(this.bytes_to_string(vicon_command_buffer,vicon_command_length) + ' ' + msg_string);
+        this.emit("log",this.bytes_to_string(vicon_command_buffer,vicon_command_length) + ' ' + msg_string);
 };
 
 
@@ -924,7 +930,7 @@ PelcoD_Decoder.prototype.decode_vicon = function(vicon_command_buffer,vicon_comm
 
 
 // Returns the length of a command (as this protocol uses variable length messages)
-PelcoD_Decoder.prototype.ad_message_length = function(command,byte3) { // ,byte4,byte5) {
+ad_message_length(command,byte3) { // ,byte4,byte5) {
     if (command == 0xA6) return 13; // Goto Abs Position
     if (command == 0xC0) return 5; // Proportional Speed
     if (command == 0xC4) return 6; // Get Config
@@ -939,7 +945,7 @@ PelcoD_Decoder.prototype.ad_message_length = function(command,byte3) { // ,byte4
     return 3;  // all other commands are 3 bytes long (address, command, checksum)
 };
 
-PelcoD_Decoder.prototype.decode_ad422 = function(ad_command_buffer) {
+decode_ad422(ad_command_buffer) {
 
     var msg_string ='';
 
@@ -1109,12 +1115,12 @@ PelcoD_Decoder.prototype.decode_ad422 = function(ad_command_buffer) {
 command_code;
     }
 
-    console.log(this.bytes_to_string(ad_command_buffer,length) + ' ' + msg_string);
+    this.emit("log",this.bytes_to_string(ad_command_buffer,length) + ' ' + msg_string);
 
     return;
 };
 
-PelcoD_Decoder.prototype.decode_panasonic = function(buffer,length) {
+decode_panasonic(buffer,length) {
 
     var msg_string = "";
 
@@ -1123,12 +1129,12 @@ PelcoD_Decoder.prototype.decode_panasonic = function(buffer,length) {
     for (var i = 1; i < length -1; i++) {
         msg_string += String.fromCharCode(buffer[i]);
     }
-    console.log(msg_string);
+    this.emit("log",msg_string);
     return;
 };
 
 
-PelcoD_Decoder.prototype.bytes_to_string = function(buffer, length) {
+bytes_to_string(buffer, length) {
     var byte_string = '';
     for (var i = 0; i < length; i++) {
         byte_string += '[' + this.DecToHexPad(buffer[i],2) + ']';
@@ -1136,12 +1142,13 @@ PelcoD_Decoder.prototype.bytes_to_string = function(buffer, length) {
     return byte_string;
 };
 
-PelcoD_Decoder.prototype.DecToHexPad = function(decimal,size) {
+DecToHexPad(decimal,size) {
     var ret_string = decimal.toString('16');
     while (ret_string.length < size) {
         ret_string = '0' + ret_string;
     }
     return ret_string;
 };
+} // end class
 
-module.exports = PelcoD_Decoder;
+module.exports = { PelcoD_Decoder };
