@@ -122,11 +122,11 @@ pelco_d_decoder.on('log', function(message) {
     console.log(message);
 });
 
-if (extra_decoder_1) {
+try{
   extra_decoder_1.on('log', function(message) {
       console.log(message);
   });
-}
+} catch (err) {}
 
 
 // helper functions
