@@ -63,6 +63,13 @@ class PelcoD_Decoder extends EventEmitter {
 
 }
 
+// Get the ascii value of a character. Even 'A' is a String in javascript so cannot
+// simply match 'A' with 65 without a helper function
+ascii(str) {
+    return str.charCodeAt(0);
+}
+
+
 
 // new_data_buffer can be a NodeJS Buffer or a Javascript array
 // as the only methods called are .length and the array index '[]' operator
@@ -174,17 +181,34 @@ processBuffer(new_data_buffer) {
 
         // Add to Panasonic byte buffer accumulating bytes
         // It starts with 0x02 (STX) and ends with 0x03 (ETX)
-        // The rest of the data bytes are ASCII character bytes (0..9, A-Z etc)
+        // The rest of the data bytes are ASCII characters 0..9 and A..Z
+        // and also : and ; which are used to split parts of the command
+        // and a length byte that is is 7,F,N,V,^[0x5e],f,n,v,~[0x7e] and '('[0x28]
         if (new_byte == 0x02) {
             // Always starts with 0x02 (STX)
             this.panasonic_command_index = 0;
         }
-        if (this.panasonic_command_index < this.panasonic_command_buffer.length) {
+        var valid_byte = false;
+        if (new_byte == 0x02 || new_byte == 0x03) valid_byte = true;
+        if (new_byte >= this.ascii('0') && new_byte <= this.ascii('9')) valid_byte = true;
+        if (new_byte >= this.ascii('A') && new_byte <= this.ascii('Z')) valid_byte = true;
+        if (new_byte == this.ascii(':') || new_byte == this.ascii(';')) valid_byte = true;
+        if (new_byte == this.ascii('7') || new_byte == this.ascii('F')
+           || new_byte == this.ascii('N') || new_byte == this.ascii('V')
+           || new_byte == 0x5E || new_byte == this.ascii('f')
+           || new_byte == this.ascii('n') || new_byte == this.ascii('v')
+           || new_byte == 0x7E || new_byte == 0x28) valid_byte = true;
+        if (valid_byte == false) {
+            // not panasonic data. Reset the buffer
+            this.panasonic_command_index = 0;
+        }
+
+        if (this.panasonic_command_index < this.panasonic_command_buffer.length
+             && valid_byte == true ) {
             // Add the new_byte to the end of the panasonic_command_buffer
             this.panasonic_command_buffer[this.panasonic_command_index] = new_byte;
             this.panasonic_command_index++;
         }
-
 
         // Pelco D Test. Check if we have 7 bytes with byte 0 = 0xFF and with a valid SUM checksum
         if (this.pelco_command_index === 7 && this.pelco_command_buffer[0] === 0xFF

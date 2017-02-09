@@ -6,7 +6,7 @@ var PelcoD_Decoder = require("../pelcod_decoder.js").PelcoD_Decoder;
 var log_string = '';
 var pelcod_decoder = new PelcoD_Decoder();
 pelcod_decoder.on('log',function(msg) { 
-  console.log('>1>1' + msg);
+  console.log('LOG:' + msg);
   log_string = msg;
 });
 
@@ -430,6 +430,45 @@ describe("Pelco D Decoder", function() {
 0x01,0xFA,0x0A,0x01,0xFA,                                         // Get current position (Degs)
 0x01,0xFA,0x8A,0xC1,0x08,0xCC,0xFF,0xFC,0xA4,0x47,0x00            // Goto position (Degs)
       ];
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
+
+  describe("Test Panasonic", function() {
+    it("tests panasonic data", function() {
+      bytes = []
+      bytes.push(0x02);
+      AppendStringToByteArray('GC7:002110C',bytes);
+      bytes.push(0x03);
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+
+      bytes = []
+      bytes.push(0x02);
+      AppendStringToByteArray('GCF:2021400:2022000',bytes);
+      bytes.push(0x03);
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+
+      bytes = []
+      bytes.push(0x02);
+      AppendStringToByteArray('GCN:20214B0:2022018:2022001',bytes);
+      bytes.push(0x03);
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+
+      bytes = []
+      bytes.push(0x02);
+      AppendStringToByteArray('GCV:20214D0:2022238:2022201:90300C7',bytes);
+      bytes.push(0x03);
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+
+      bytes = []
+      bytes.push(0x02);
+      AppendStringToByteArray('GC^:20214C2:2022028:2022439:202203A:2022163',bytes);
+      bytes.push(0x03);
       var buf = new Buffer(bytes);
       pelcod_decoder.processBuffer(buf);
     });
