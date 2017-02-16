@@ -1150,9 +1150,77 @@ decode_panasonic(buffer,length) {
 
     msg_string += "Panasonic ";
 
+    var command = '';
     for (var i = 1; i < length -1; i++) {
-        msg_string += String.fromCharCode(buffer[i]);
+        command += String.fromCharCode(buffer[i]);
     }
+    msg_string += command;
+    msg_string += ' ';
+
+    var commands = command.split(/[;:]/); // split regex on : or ;
+
+    var cmd_index = 0;
+    for (cmd_index = 0; cmd_index < commands.length; cmd_index++) {
+      if (commands[cmd_index] == '0021002') { msg_string += '[Iris Open With Timeout]';}
+      if (commands[cmd_index] == '0021003') { msg_string += '[Iris Close With Timeout]';}
+      if (commands[cmd_index] == '0021004') { msg_string += '[Iris Stop]';}
+      if (commands[cmd_index] == '0021005') { msg_string += '[Iris Reset]';}
+      if (commands[cmd_index] == '0021040') { msg_string += '[B/W On]';}
+      if (commands[cmd_index] == '0021041') { msg_string += '[B/W Off]';}
+
+      if (commands[cmd_index] == '00219F0') { 
+         cmd_index++; // add extra increment as we are processing 2 commands
+         var txt_str = commands[cmd_index];
+         var value = parseInt('0x' + txt_str.substring(4,6));
+         if (txt_str >= '0022000' && txt_str <= '00223F0') msg_string += '[Call Preset ' + (value+1) + ']';
+         if (txt_str >= '0022640' && txt_str <= '0022A30') msg_string += '[Set Preset ' + ((value-0x64)+1)+ ']';
+      }
+  
+      if (commands[cmd_index] == '2021160') { msg_string += '[Aux 1 On]';}
+      if (commands[cmd_index] == '2021161') { msg_string += '[Aux 1 Off]';}
+      if (commands[cmd_index] == '2021224') { msg_string += '[Zoom Stop & Focus Stop With Timeout]';}
+  
+      if (commands[cmd_index] == '2021228') { msg_string += '[Zoom In With Timeout]';}
+      if (commands[cmd_index] == '202122C') { msg_string += '[Zoom Out With Timeout]';}
+      if (commands[cmd_index] == '202126A') { msg_string += '[Focus Far With Timeout]';}
+      if (commands[cmd_index] == '202126E') { msg_string += '[Focus Near With Timeout]';}
+
+      if (commands[cmd_index].startsWith('90310')) { 
+        var preset_number = parseInt('0x' + commands[cmd_index].substring(5,7));
+        msg_string += '[Call Preset ' + preset_number + ']';
+      }
+      if (commands[cmd_index].startsWith('90311')) {
+        var preset_number = parseInt('0x' + commands[cmd_index].substring(5,7));
+        msg_string += '[Set Preset ' + preset_number + ']';
+      }
+
+      if (commands[cmd_index].startsWith("AD")) { msg_string += '[Cam NN]';}
+      if (commands[cmd_index].startsWith("D")) {
+        var zoom_char = commands[cmd_index].charAt(1);
+        var pt_dir_char = commands[cmd_index].charAt(2);
+        var pan_speed_str = commands[cmd_index].substring(3,5);
+        var tilt_speed_str = commands[cmd_index].substring(5,7);
+        var zoom_byte = parseInt(zoom_char,16); // Hex to Dec
+        var pt_direction_byte = parseInt(pt_dir_char,16); // Hex to Dec
+        var pan_speed = parseInt(pan_speed_str,16); // Hex to Dec
+        var tilt_speed = parseInt(tilt_speed_str,16); // Hex to Dec
+
+	if (pt_direction_byte == 1) msg_string += '[Pan Stop][Tilt Stop]';
+	else if (pt_direction_byte == 8) msg_string += '[Pan Left (' + pan_speed + ')]';
+	else if (pt_direction_byte == 9) msg_string += '[Pan Left (' + pan_speed + ')]' + 'Tilt Up (' + tilt_speed + ')]';
+	else if (pt_direction_byte == 12) msg_string += '[Pan Right (' + pan_speed + ')]';
+	else if (pt_direction_byte == 10) msg_string += '[Tilt Up (' + tilt_speed + ')]';
+	else if (pt_direction_byte == 11) msg_string += '[Pan Right (' + pan_speed + ')]' + 'Tilt Up (' + tilt_speed + ')]';
+	else if (pt_direction_byte == 13) msg_string += '[Pan Right (' + pan_speed + ')]' + 'Tilt Down (' + tilt_speed + ')]';
+	else if (pt_direction_byte == 14) msg_string += '[Tilt Down (' + tilt_speed + ')]';
+	else if (pt_direction_byte == 15) msg_string += '[Pan Left (' + pan_speed + ')]' + 'Tilt Down (' + tilt_speed + ')]';
+        else msg_string += '[Other Pan/Tilt/Zoom command]';
+
+        msg_string += '[Zoom byte is ' + zoom_byte + ']';
+      }
+
+    }
+
     this.emit("log",msg_string);
     return;
 };
