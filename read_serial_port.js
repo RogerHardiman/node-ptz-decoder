@@ -14,7 +14,9 @@
  */
 
 // External Dependencies
+var fs = require('fs');
 var SerialPort = require('serialport');
+var dateTime = require('node-datetime');
 var PelcoD_Decoder = require('./pelcod_decoder').PelcoD_Decoder;
 try {
 var Extra_Decoder_1 = require('./extra_decoder_1');
@@ -71,14 +73,34 @@ var data_bits = 8;
 var parity = 'none';
 var stop_bits = 1;
 
+// Log File
+var log_fd;
+
 // User Settings
 if (args.port) serial_port = args.port;
 if (args.baud) baud_rate = args.baud;
 if (args.parity === 'none' || args.parity === 'odd' || args.parity === 'even') parity = args.parity;
 
-// Open Serial Port.
+// Initialise Decoders
 if (PelcoD_Decoder)  var pelco_d_decoder = new PelcoD_Decoder();
 if (Extra_Decoder_1) var extra_decoder_1 = new Extra_Decoder_1();
+
+// Open log file
+var now = dateTime.create();
+var filename = 'log_' + now.format('Y_m_d_H_M_S') + '.txt';
+fs.open(filename,'w',function(err,fd) {
+  if (err) {
+    console.log('ERROR - cannot create log file ' + filename);
+    console.log(err);
+    console.log('');
+    process.exit(1);
+  }
+  log_fd = fd;
+  console.log('Log File Open ('+filename+')');
+});
+
+
+// Open Serial Port.
 var port = new SerialPort(serial_port, {
     baudrate: baud_rate,
     parity: parity,
@@ -105,7 +127,18 @@ port.on('open', function(err) {
 
 // Callback - Data
 port.on('data', function(buffer) {
+
+    // write to console
     if (args.verbose) process.stdout.write(BufferToHexString(buffer));
+
+    // write to log file if 'fd' is not undefined
+    if (log_fd) {
+      var msg = 'Rx' + BufferToHexString(buffer) + '\r\n';
+      fs.write(log_fd,msg,function(err) {
+        if (err) console.log('Error writing to file');
+      });
+    }
+
     // pass to each decoder
     if (pelco_d_decoder) pelco_d_decoder.processBuffer(buffer);
     if (extra_decoder_1) extra_decoder_1.processBuffer(buffer);
@@ -119,12 +152,32 @@ port.on('disconnect', function(err) {
 
 // Callback - Dedoded protocol
 pelco_d_decoder.on('log', function(message) {
+    // show on console
     console.log(message);
+
+    // Write to file
+    if (log_fd) {
+      var msg = '=>' + message + '\r\n';
+      fs.write(log_fd,msg,function(err) {
+        if (err) console.log('Error writing to file');
+      });
+    }
+
 });
 
 try{
   extra_decoder_1.on('log', function(message) {
-      console.log(message);
+    // show on console
+    console.log(message);
+
+    // Write to file
+    if (log_fd) {
+      var msg = '=>' + message + '\r\n';
+      fs.write(log_fd,msg,function(err) {
+        if (err) console.log('Error writing to file');
+      });
+    }
+
   });
 } catch (err) {}
 
