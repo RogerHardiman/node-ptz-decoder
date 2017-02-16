@@ -35,6 +35,7 @@ args.option('-v, --verbose','Verbose mode. Show all data bytes');
 args.option('-p, --port <name>','Serial Port eg COM1 or /dev/ttyUSB0');
 args.option('-b, --baud <value>','Baud Rate. Default 2400',parseInt);
 args.option('--parity <value>','Parity none, even, odd. Default none');
+args.option('--nolog','Do not write to the log file. Default is to write logs');
 args.parse(process.argv);
 
 // Initial message
@@ -88,16 +89,21 @@ if (Extra_Decoder_1) var extra_decoder_1 = new Extra_Decoder_1();
 // Open log file
 var now = dateTime.create();
 var filename = 'log_' + now.format('Y_m_d_H_M_S') + '.txt';
-fs.open(filename,'w',function(err,fd) {
-  if (err) {
-    console.log('ERROR - cannot create log file ' + filename);
-    console.log(err);
-    console.log('');
-    process.exit(1);
-  }
-  log_fd = fd;
-  console.log('Log File Open ('+filename+')');
-});
+if (args.nolog) {
+  console.log('Log file disabled');
+} else {
+  fs.open(filename,'w',function(err,fd) {
+    if (err) {
+      console.log('ERROR - cannot create log file ' + filename);
+      console.log(err);
+      console.log('');
+      process.exit(1);
+    }
+    log_fd = fd;
+    console.log('Log File Open ('+filename+')');
+  });
+}
+
 
 
 // Open Serial Port.
