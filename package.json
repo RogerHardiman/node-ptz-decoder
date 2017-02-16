@@ -12,6 +12,7 @@
     "url": "https://github.com/rogerhardiman/node-pelcod-decoder.git"
   },
   "dependencies": {
+    "node-datetime": "^1.0.0",
     "serialport": "^4.0.0",
     "commander": "^2.9.0"
   },
