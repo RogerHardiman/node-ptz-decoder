@@ -597,7 +597,7 @@ decode_bosch(bosch_command_buffer) {
 
 
         if (left === 0 && right === 0) {
-            msg_string += '[pan stop     ]';
+            msg_string += '[pan stop ('+pan_speed+')]';
         } else if (left === 1 && right === 0) {
             msg_string += '[PAN LEFT ('+pan_speed+')]';
         } else if (left === 0 && right === 1) {
@@ -607,7 +607,7 @@ decode_bosch(bosch_command_buffer) {
         }
 
         if (up === 0 && down === 0) {
-            msg_string += '[tilt stop    ]';
+            msg_string += '[tilt stop('+tilt_speed+')]';
         } else if (up === 1 && down === 0) {
             msg_string += '[TILT UP  ('+tilt_speed+')]';
         } else if (up === 0 && down === 1) {
@@ -617,7 +617,7 @@ decode_bosch(bosch_command_buffer) {
         }
 
         if (zoom_in === 0 && zoom_out === 0) {
-            msg_string += '[zoom stop]';
+            msg_string += '[zoom stop('+zoom_speed+')]';
         } else if (zoom_in === 1 && zoom_out === 0) {
             msg_string += '[ZOOM IN('+zoom_speed+')]';
         } else if (zoom_in === 0 && zoom_out === 1) {
