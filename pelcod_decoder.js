@@ -61,6 +61,11 @@ class PelcoD_Decoder extends EventEmitter {
     // Number of bytes in the current Buffer
     this.panasonic_command_index = 0;
 
+    // A Buffer used for Visca (variable length message)
+    this.visca_command_buffer = new Buffer(128);
+
+    // Number of bytes in the current Buffer
+    this.visca_command_index = 0;
 }
 
 // Get the ascii value of a character. Even 'A' is a String in javascript so cannot
@@ -240,7 +245,8 @@ processBuffer(new_data_buffer) {
 
         // Bosch Test. First byte has MSB of 1. First byte is the message size (excluding the checksum)
         var bosch_len = this.bosch_command_buffer[0] & 0x7F;
-        if ((this.bosch_command_buffer[0] & 0x80)
+        if ((bosch_len > 1)
+                                             && (this.bosch_command_buffer[0] & 0x80)
                                              && this.bosch_command_index == (bosch_len + 1)
                                              && this.checksum_bosch_valid(this.bosch_command_buffer, this.bosch_command_index)) {
             // Looks like we have a Bosch command. Try and process it
@@ -296,6 +302,28 @@ processBuffer(new_data_buffer) {
             this.panasonic_command_index = 0; // empty the buffer
         }
 
+        // Collect VISCA data
+        // Starts with MSBit = 1
+        // Ends with 0xFF
+        if ((new_byte & 0x80) && (new_byte != 0xFF)) {
+            // MSB is set to 1. This marks the start of a the command so reset buffer counter
+            this.visca_command_buffer[0] = new_byte;
+            this.visca_command_index = 1;
+        } else if (this.visca_command_index < this.visca_command_buffer.length) {
+            // Add the new_byte to the end of the command_buffer
+            this.visca_command_buffer[this.visca_command_index] = new_byte;
+            this.visca_command_index++;
+        }
+
+        // Check for valid command
+        if ((this.visca_command_index >= 3) // at least 3 bytesisca_command_buffer[0] & 0x80 // MSBit set to 1
+           &&(this.visca_command_buffer[0] & 0x80) // first byte has MSB set to 1
+           &&(this.visca_command_buffer[this.visca_command_index - 1] == 0xFF) // last byte is 0xFF
+        ){
+            // Looks like a VISCA command. Process it
+            this.decode_visca(this.visca_command_buffer,this.visca_command_index);
+            this.visca_command_index = 0;
+        }
 
 
     }
@@ -1225,6 +1253,45 @@ decode_panasonic(buffer,length) {
     return;
 };
 
+decode_visca(buffer,length) {
+
+    var msg_string = "";
+
+    msg_string += "VISCA ";
+
+    if (length == 9 && buffer[1] == 0x01 && buffer[2] == 0x06 && buffer[3] == 0x01) {
+        // Pan/Tilt command
+        var pan_speed = buffer[4];
+        var tilt_speed = buffer[5];
+        var pan_direction = buffer[6];
+        var tilt_direction = buffer[7];
+
+        if (pan_direction == 0x01) msg_string += '[Pan Left(' + pan_speed + ')]';
+        if (pan_direction == 0x02) msg_string += '[Pan Right(' + pan_speed + ')]';
+        if (pan_direction == 0x03) msg_string += '[Pan Stop]';
+
+        if (tilt_direction == 0x01) msg_string += '[Tilt Up(' + tilt_speed + ')]';
+        if (tilt_direction == 0x02) msg_string += '[Tilt Down(' + tilt_speed + ')]';
+        if (tilt_direction == 0x03) msg_string += '[Tilt Stop]';
+    } else if (length == 5 && buffer[1] == 0x01 && buffer[2] == 0x06 && buffer[3] == 0x04) {
+        msg_string += 'Home';
+    } else if (length == 6 && buffer[1] == 0x01 && buffer[2] == 0x04 && buffer[3] == 0x07) {
+        // Zoom command
+        var cmd = buffer[4];
+        var speed = buffer[4] & 0x0F;
+        if (cmd == 0x00) msg_string += '[Zoom Stop]';
+        else if (cmd == 0x02) msg_string += '[Zoom In]';
+        else if (cmd == 0x03) msg_string += '[Zoom Out]';
+        else if ((cmd & 0xF0) == 0x20) msg_string += '[Zoom In('+speed+')]';
+        else if ((cmd & 0xF0) == 0x30) msg_string += '[Zoom Out('+speed+')]';
+    } else {
+        msg_string += 'Other VISCA command';
+    }
+
+    this.emit("log",this.bytes_to_string(buffer,length) + ' ' + msg_string);
+
+    return;
+};
 
 bytes_to_string(buffer, length) {
     var byte_string = '';
