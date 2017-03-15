@@ -1275,15 +1275,48 @@ decode_visca(buffer,length) {
         if (tilt_direction == 0x03) msg_string += '[Tilt Stop]';
     } else if (length == 5 && buffer[1] == 0x01 && buffer[2] == 0x06 && buffer[3] == 0x04) {
         msg_string += 'Home';
-    } else if (length == 6 && buffer[1] == 0x01 && buffer[2] == 0x04 && buffer[3] == 0x07) {
-        // Zoom command
-        var cmd = buffer[4];
-        var speed = buffer[4] & 0x0F;
-        if (cmd == 0x00) msg_string += '[Zoom Stop]';
-        else if (cmd == 0x02) msg_string += '[Zoom In]';
-        else if (cmd == 0x03) msg_string += '[Zoom Out]';
-        else if ((cmd & 0xF0) == 0x20) msg_string += '[Zoom In('+speed+')]';
-        else if ((cmd & 0xF0) == 0x30) msg_string += '[Zoom Out('+speed+')]';
+    } else if (length == 6 && buffer[1] == 0x01 && buffer[2] == 0x04) {
+        var b3 = buffer[3];
+        var b4 = buffer[4];
+	// Zoom
+        if      (b3 == 0x07 && b4 == 0x00) msg_string += '[Zoom Stop]';
+        else if (b3 == 0x07 && b4 == 0x02) msg_string += '[Zoom In]';
+        else if (b3 == 0x07 && b4 == 0x03) msg_string += '[Zoom Out]';
+        else if (b3 == 0x07 && ((b4 & 0xF0) == 0x20)) msg_string += '[Zoom In('+(b4 & 0x0F)+')]';
+        else if (b3 == 0x07 && ((b4 & 0xF0) == 0x30)) msg_string += '[Zoom Out('+(b4 & 0x0F)+')]';
+	// Focus
+        else if (b3 == 0x08 && b4 == 0x00) msg_string += '[Focus Stop]';
+        else if (b3 == 0x08 && b4 == 0x02) msg_string += '[Focus Far]';
+        else if (b3 == 0x08 && b4 == 0x03) msg_string += '[Focus Near]';
+        else if (b3 == 0x08 && ((b4 & 0xF0) == 0x20)) msg_string += '[Focus Far('+(b4 & 0x0F)+')]';
+        else if (b3 == 0x08 && ((b4 & 0xF0) == 0x30)) msg_string += '[Focus Near('+(b4 & 0x0F)+')]';
+        else if (b3 == 0x38 && b4 == 0x02) msg_string += '[Auto Focus]';
+        else if (b3 == 0x38 && b4 == 0x03) msg_string += '[Manual Focus]';
+        else if (b3 == 0x38 && b4 == 0x10) msg_string += '[Auto/Manual Focus]';
+        else if (b3 == 0x18 && b4 == 0x01) msg_string += '[One Push Trigger Focus]';
+        else if (b3 == 0x18 && b4 == 0x02) msg_string += '[Infinity Focus]';
+	// Automatic Exposure (AE)
+        else if (b3 == 0x39 && b4 == 0x00) msg_string += '[Full Auto Exposure]';
+        else if (b3 == 0x39 && b4 == 0x03) msg_string += '[Manual Exposire]';
+        else if (b3 == 0x39 && b4 == 0x0A) msg_string += '[Shutter Prioirty Exposure]';
+        else if (b3 == 0x39 && b4 == 0x0B) msg_string += '[Iris Priority Exposure]';
+        else if (b3 == 0x39 && b4 == 0x0D) msg_string += '[Bright Exposure]';
+	// Iris
+        else if (b3 == 0x0B && b4 == 0x00) msg_string += '[Iris Reset]';
+        else if (b3 == 0x0B && b4 == 0x02) msg_string += '[Iris Up]';
+        else if (b3 == 0x0B && b4 == 0x03) msg_string += '[Iris Down]';
+        else msg_string += 'Other VISCA command';
+    } else if (length == 7 && buffer[1] == 0x01 && buffer[2] == 0x04) {
+        var b3 = buffer[3];
+        var b4 = buffer[4];
+        var b5 = buffer[5]; // range starts at zero
+        if (b3 == 0x3f && b4 == 0x01) msg_string += '[Set Preset '+(b5+1)+']';
+        if (b3 == 0x3f && b4 == 0x02) msg_string += '[Goto Preset '+(b5+1)+']';
+	else msg_string += 'Other VISCA command';
+    } else if (length == 4 && buffer[1] == 0x30 && buffer[2] == 0x01) {
+        msg_string += 'Address Set Command';
+    } else if (length == 5 && buffer[1] == 0x01 && buffer[2] == 0x00 && buffer[3] == 0x01) {
+        msg_string += 'IF_Clear Command';
     } else {
         msg_string += 'Other VISCA command';
     }
