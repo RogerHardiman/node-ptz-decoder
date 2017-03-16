@@ -1259,6 +1259,37 @@ decode_visca(buffer,length) {
 
     msg_string += "VISCA ";
 
+    // Get Sender and Receiver (or Broadcast) address details
+    var sender_id = (buffer[0] >> 4) & 0x07;
+    var broadcast_bit = (buffer[0] >> 3) & 0x01;
+    var receiver_id = (buffer[0]) & 0x07;
+
+    if (buffer[0] == 0x88) msg_string += 'From ' + sender_id + ' To All ';
+    else if (broadcast_bit == 0) msg_string += 'From ' + sender_id + ' To ' + receiver_id + ' ';
+    else {
+      // does not look like a VISCA command. broatcast bit is '1' but byte is not 0x88
+      return;
+    }
+
+    // buffer[1] is 0x01 for Command messages
+    //              0x09 for Inquiry messages
+    //              0x2x for Cancel messages
+    //              0x30 for Broadcast messages
+    //              0x4x for reply ACK messages
+    //              0x5x for reply Completion Command messages
+    //              0x6x for reply Error messages
+    var process = false;
+    if (buffer[1] == 0x01) process=true;
+    if (buffer[1] == 0x09) process=true;
+    if ((buffer[1]&0xF0) == 0x20) process=true;
+    if (buffer[1] == 0x30) process=true;
+    if ((buffer[1]&0xF0) == 0x40) process=true;
+    if ((buffer[1]&0xF0) == 0x50) process=true;
+    if ((buffer[1]&0xF0) == 0x60) process=true;
+
+    if (process==false) return;
+
+
     if (length == 9 && buffer[1] == 0x01 && buffer[2] == 0x06 && buffer[3] == 0x01) {
         // Pan/Tilt command
         var pan_speed = buffer[4];
@@ -1267,19 +1298,42 @@ decode_visca(buffer,length) {
         var tilt_direction = buffer[7];
 
         if (pan_direction == 0x01) msg_string += '[Pan Left(' + pan_speed + ')]';
-        if (pan_direction == 0x02) msg_string += '[Pan Right(' + pan_speed + ')]';
-        if (pan_direction == 0x03) msg_string += '[Pan Stop]';
+        else if (pan_direction == 0x02) msg_string += '[Pan Right(' + pan_speed + ')]';
+        else if (pan_direction == 0x03) msg_string += '[Pan Stop]';
+        else msg_string += '[Pan ????]';
 
         if (tilt_direction == 0x01) msg_string += '[Tilt Up(' + tilt_speed + ')]';
-        if (tilt_direction == 0x02) msg_string += '[Tilt Down(' + tilt_speed + ')]';
-        if (tilt_direction == 0x03) msg_string += '[Tilt Stop]';
+        else if (tilt_direction == 0x02) msg_string += '[Tilt Down(' + tilt_speed + ')]';
+        else if (tilt_direction == 0x03) msg_string += '[Tilt Stop]';
+        else msg_string += '[Tilt ????]';
+    } else if (length == 15 && buffer[1] == 0x01 && buffer[2] == 0x06 && buffer[3] == 0x02) {
+        // Pan/Tilt command (15 byte version. There is a 16 byte version too)
+        var pan_speed = buffer[4];
+        var tilt_speed = buffer[5];
+        var pan_pos = ( ((buffer[6]&0x0F) << 24)
+                      + ((buffer[7]&0x0F) << 16)
+                      + ((buffer[8]&0x0F) << 8)
+                      + ((buffer[9]&0x0F) << 0) );
+        var tilt_pos = ( ((buffer[10]&0x0F) << 24)
+                       + ((buffer[11]&0x0F) << 16)
+                       + ((buffer[12]&0x0F) << 8)
+                       + ((buffer[13]&0x0F) << 0) );
+
+        msg_string += 'Absolute Move. PanSpeed='+pan_speed+' TiltSpeed='+tilt_speed+' PanPos='+pan_pos+' TiltPos='+tilt_pos;
     } else if (length == 5 && buffer[1] == 0x01 && buffer[2] == 0x06 && buffer[3] == 0x04) {
         msg_string += 'Home';
+    } else if (length == 6 && buffer[1] == 0x01 && buffer[2] == 0x06 && buffer[3] == 0x06 && buffer[4] == 0x02) {
+        msg_string += 'OSD Menu on';
+    } else if (length == 6 && buffer[1] == 0x01 && buffer[2] == 0x06 && buffer[3] == 0x06 && buffer[4] == 0x02) {
+        msg_string += 'OSD Menu off';
     } else if (length == 6 && buffer[1] == 0x01 && buffer[2] == 0x04) {
         var b3 = buffer[3];
         var b4 = buffer[4];
+        // Power
+        if      (b3 == 0x00 && b4 == 0x02) msg_string += 'Power On';
+        else if (b3 == 0x00 && b4 == 0x03) msg_string += 'Power Off';
 	// Zoom
-        if      (b3 == 0x07 && b4 == 0x00) msg_string += '[Zoom Stop]';
+        else if (b3 == 0x07 && b4 == 0x00) msg_string += '[Zoom Stop]';
         else if (b3 == 0x07 && b4 == 0x02) msg_string += '[Zoom In]';
         else if (b3 == 0x07 && b4 == 0x03) msg_string += '[Zoom Out]';
         else if (b3 == 0x07 && ((b4 & 0xF0) == 0x20)) msg_string += '[Zoom In('+(b4 & 0x0F)+')]';
@@ -1310,9 +1364,19 @@ decode_visca(buffer,length) {
         var b3 = buffer[3];
         var b4 = buffer[4];
         var b5 = buffer[5]; // range starts at zero
-        if (b3 == 0x3f && b4 == 0x01) msg_string += '[Set Preset '+(b5+1)+']';
-        if (b3 == 0x3f && b4 == 0x02) msg_string += '[Goto Preset '+(b5+1)+']';
+        if      (b3 == 0x3f && b4 == 0x00) msg_string += '[Reset Preset '+(b5)+']';
+        else if (b3 == 0x3f && b4 == 0x01) msg_string += '[Set Preset '+(b5)+']';
+        else if (b3 == 0x3f && b4 == 0x02) msg_string += '[Goto Preset '+(b5)+']';
 	else msg_string += 'Other VISCA command';
+    } else if (length == 9 && buffer[1] == 0x01 && buffer[2] == 0x04) {
+        var b3 = buffer[3];
+        var time = ( ((buffer[4]&0x0F) << 24)
+                   + ((buffer[5]&0x0F) << 16)
+                   + ((buffer[6]&0x0F) << 8)
+                   + ((buffer[7]&0x0F) << 0) );
+        if (b3 == 0x40) msg_string += 'Auto PowerOff '+time+' seconds'; //D100
+	else msg_string += 'Other VISCA command';
+    } else if (length == 4 && buffer[1] == 0x30 && buffer[2] == 0x01) {
     } else if (length == 4 && buffer[1] == 0x30 && buffer[2] == 0x01) {
         msg_string += 'Address Set Command';
     } else if (length == 5 && buffer[1] == 0x01 && buffer[2] == 0x00 && buffer[3] == 0x01) {
