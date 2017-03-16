@@ -1,6 +1,6 @@
-# Pelco D, Pelco P, BBV422 and Bosch (Philips PCSS), Forward Vision, Vicon, American Dynamics(Sensormatic) and Panasonic Telemetry Decoder (node-pelcod-decoder)
+# Pelco D, Pelco P, BBV422 and Bosch (Philips PCSS), Forward Vision, Vicon, American Dynamics(Sensormatic), Panasonic and Sony VISCA Telemetry Decoder (node-pelcod-decoder)
 
-This module reads Pelco D, Pelco P, BBV422, Bosch(Philips PCSS), Forward Vision, Vicon, American Dynamics(Sensormatic) and Panasonic CCTV Camera Pan/Tilt/Zoom data, validates each command and decodes its meaning.
+This module reads Pelco D, Pelco P, BBV422, Bosch(Philips PCSS), Forward Vision, Vicon, American Dynamics(Sensormatic), Panasonic and Sony VISCA CCTV Camera Pan/Tilt/Zoom data, validates each command and decodes its meaning.
 The descripion of each command is written to the console.
 
 The Pelco D, Pelco P and BBV422 commands decoded include  
@@ -55,6 +55,12 @@ The Panasonic commands decoded include
   * Camera Number
   * ASCII command string (which is not decoded at this time)
 
+The Sony VISCA commands decoded include
+  * Pan  (direction and speed)
+  * Tilt (direction and speed)
+  * Zoom (Tele/In and Wide/Out)
+  * Goto Preset
+  * Store Preset
 
   
 # Installation
