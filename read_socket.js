@@ -22,9 +22,8 @@ var args = require('commander');
 // Command line arguments
 args.version(version);
 args.description('Pelco D, Pelco P, BBV422, Philips/Bosch, Vicon, Forward Vision, Pansonic and American Dynamics/Sensormatic parser');
-args.option('-l, --list','List serial ports');
 args.option('-v, --verbose','Verbose mode. Show all data bytes');
-args.option('-p, --port <name>','Serial Port eg COM1 or /dev/ttyUSB0');
+args.option('-p, --port <number>','TCP Port to listen');
 args.option('--nolog','Do not write to the log file. Default is to write logs');
 args.parse(process.argv);
 
@@ -102,9 +101,15 @@ var server = new net.createServer(function(sock) {
     if (pelco_d_decoder) pelco_d_decoder.processBuffer(buffer);
     if (extra_decoder_1) extra_decoder_1.processBuffer(buffer);
   });
+
   // Callback - Close
   sock.on('close', function(data) {
-    console.log('Network Connection from ' + sock.remoteAddress + ':' + sock.remotePort + ' received');
+    console.log('Network close from ' + sock.remoteAddress + ':' + sock.remotePort + ' received');
+  });
+
+  // Callback - Error
+  sock.on('error', function(err) {
+    console.log('Network error ' + err);
   });
 });
 server.listen(port,'127.0.0.1');
