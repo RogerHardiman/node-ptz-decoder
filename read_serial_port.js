@@ -134,12 +134,15 @@ port.on('open', function(err) {
 // Callback - Data
 port.on('data', function(buffer) {
 
+    var now = dateTime.create();
+    var nowString = now.format('H:M:S.N');
+    var msg = nowString + 'Rx' + BufferToHexString(buffer) + '\r\n';
+
     // write to console
-    if (args.verbose) process.stdout.write(BufferToHexString(buffer));
+    if (args.verbose) console.log(msg);
 
     // write to log file if 'fd' is not undefined
     if (log_fd) {
-      var msg = 'Rx' + BufferToHexString(buffer) + '\r\n';
       fs.write(log_fd,msg,function(err) {
         if (err) console.log('Error writing to file');
       });
@@ -158,12 +161,16 @@ port.on('disconnect', function(err) {
 
 // Callback - Dedoded protocol
 pelco_d_decoder.on('log', function(message) {
+
+    var now = dateTime.create();
+    var nowString = now.format('H:M:S.N');
+    var msg = nowString + '=>' + message + '\r\n';
+
     // show on console
-    console.log(message);
+    console.log(msg);
 
     // Write to file
     if (log_fd) {
-      var msg = '=>' + message + '\r\n';
       fs.write(log_fd,msg,function(err) {
         if (err) console.log('Error writing to file');
       });
@@ -173,12 +180,16 @@ pelco_d_decoder.on('log', function(message) {
 
 try{
   extra_decoder_1.on('log', function(message) {
+
+    var now = dateTime.create();
+    var nowString = now.format('H:M:S.N');
+    var msg = nowString + '=>' + message + '\r\n';
+
     // show on console
-    console.log(message);
+    console.log(msg);
 
     // Write to file
     if (log_fd) {
-      var msg = '=>' + message + '\r\n';
       fs.write(log_fd,msg,function(err) {
         if (err) console.log('Error writing to file');
       });
