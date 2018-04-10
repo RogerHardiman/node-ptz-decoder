@@ -421,6 +421,18 @@ describe("Pelco D Decoder", function() {
     });
   });
 
+  describe("VCL Telemetry block of data", function() {
+    it("tests garbage then data", function() {
+      var bytes = [
+0x00,0x00,0x00,
+0x80,0x2D,0x81,0x2D,0x81,0x3A,0x81,0x3B,0x81,0x55,0x40,
+0x81,0x2D
+      ];
+      var buf = new Buffer(bytes);
+      pelcod_decoder.processBuffer(buf);
+    });
+  });
+
   describe("American Dynamics / Sensormatic block of data", function() {
     it("tests garbage then AD422 data", function() {
       var bytes = [

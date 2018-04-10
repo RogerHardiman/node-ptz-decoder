@@ -1,10 +1,10 @@
 /*
- * Read and decode Pelco D, Pelco P, BBV422, Bosch/Philips, Forward Vision, Vicon, American Dynamics/Sensormatic CCTV commands
+ * Read and decode Pelco D, Pelco P, BBV422, Bosch/Philips, Forward Vision, Vicon, American Dynamics/Sensormatic and VCL CCTV PTZ commands
  * This code is not designed to decode every command.
  * The purpose is to monitor the output from various CCTV systems to confirm the protocols and camera addresses in use.
  * The meanings of certain Aux signals and special Preset values is not shown
  * 
- * (c) Copyright 2016 Roger Hardiman
+ * (c) Copyright 2016-2018 Roger Hardiman
  *
  * Processes NodeJS Buffer() data.
  * Buffer() objects may have multiple PTZ messages or just part of a message so bytes are cached if needed.
@@ -48,6 +48,12 @@ class PelcoD_Decoder extends EventEmitter {
 
     // Number of bytes in the current Buffer
     this.vicon_command_index = 0;
+
+    // A Buffer used for VCL (variable length message)
+    this.vcl_command_buffer = new Buffer(128);
+
+    // Number of bytes in the current Buffer
+    this.vcl_command_index = 0;
 
     // A Buffer used for American Dynamics/Sensormatic (variable length message)
     this.ad_command_buffer = new Buffer(128);
@@ -152,6 +158,15 @@ processBuffer(new_data_buffer) {
             // Add the new_byte to the end of the vicon_command_buffer
             this.vicon_command_buffer[this.vicon_command_index] = new_byte;
             this.vicon_command_index++;
+        }
+
+
+        // VCL. First byte is 0x80 to 0xFF and is the camera number.
+	// Rest of the command is either 2 bytes or 3 bytes
+        // Byte 2 and Byte 3 are 0x00 to 0x7F
+        // There is no 'End Byte' so need to process each byte as it arrives
+        {
+            this.decode_vcl(new_byte);
         }
 
 
@@ -979,6 +994,100 @@ decode_vicon(vicon_command_buffer,vicon_command_length) {
 
 
 
+
+
+// Returns the length of a command (as this protocol uses variable length messages)
+ad_message_length(command,byte3) { // ,byte4,byte5) {
+    if (command == 0xA6) return 13; // Goto Abs Position
+    if (command == 0xC0) return 5; // Proportional Speed
+    if (command == 0xC4) return 6; // Get Config
+    if (command == 0xC7) return 5; // Set and Goto Preset
+    if (command == 0xCC) return 4; // Various config commands
+    if (command == 0xCD) return 5; // QuickSet
+    if (command == 0xDE) return 0; // Variable Length ASCII message. 5th Byte tells us ASCII string length
+    // Check for 0xFA 'get' command has bit 7 clear. Goes not use command length bits
+    if (command == 0xFA && (byte3>>7 == 0)) return 4 + 1; // Variable Length Network Position Command. 4 bytes plus checsksum
+    // Check for 0xFA 'set' command has bit 7 set. Obey command length bits
+    if (command == 0xFA && (byte3>>7 == 1)) return (byte3 & 0x1F) + 1; // Variable Length Network Position Command plus checsksum
+    return 3;  // all other commands are 3 bytes long (address, command, checksum)
+};
+
+
+decode_vcl(new_byte) {
+
+    // VLC has no checksum or end byte so accumulate bytes until there is a command
+    // Bytes 0x80..0xFF start a command and are the camera number
+    // Bytes 0x00 to 0x7F are commands or additional data (eg speed)
+
+    // Add the byte to the Vicon buffer
+
+    if (new_byte >= 0x80 && new_byte <= 0xFF) {
+        // This marks the start of a VCL command reset buffer counter
+        this.vcl_command_index = 0;
+        this.vcl_command_buffer[this.vcl_command_index] = new_byte;
+        this.vcl_command_index++;
+    }
+    else if (this.vcl_command_index > 0 && this.vcl_command_index < this.vcl_command_buffer.length) {
+        // Add the new_byte to the end of the vcl_command_buffer
+        this.vcl_command_buffer[this.vcl_command_index] = new_byte;
+        this.vcl_command_index++;
+    }
+
+    // Check if we have at least 2 bytes
+    if (this.vcl_command_index < 2) return;
+
+    var msg_string ='';
+
+    msg_string += 'VCL ';
+
+    var camera_id = this.vcl_command_buffer[0] - 0x7F;
+    msg_string += 'Camera ' + camera_id + ' ';
+
+
+    var byte2 = this.vcl_command_buffer[1];
+
+    var has_byte3 = false;
+    var byte3 = 0
+    if (this.vcl_command_index >= 3) {
+        has_byte3 = true;
+        byte3 = this.vcl_command_buffer[2];
+    }
+
+    if (byte2 == 0x2D) msg_string += '[Stop]';
+    else if (byte2 == 0x3A) msg_string += '[Zoom In]';
+    else if (byte2 == 0x3B) msg_string += '[Zoom Out]';
+    else if (byte2 == 0x3C) msg_string += '[Focus Near]';
+    else if (byte2 == 0x3D) msg_string += '[Focus Far]';
+    else if (byte2 == 0x3E) msg_string += '[Iris Open]';
+    else if (byte2 == 0x3F) msg_string += '[Iris Close]';
+    else if (byte2 == 0x41) msg_string += '[Auto Focus]';
+    else if (byte2 == 0x4D) msg_string += '[Auto Iris]';
+    else if (byte2 == 0x5B) msg_string += '[Aux 1 On]';
+    else if (byte2 == 0x5C) msg_string += '[Aux 2 On]';
+    else if (byte2 == 0x5D) msg_string += '[Aux 3 On]';
+    else if (byte2 == 0x61) msg_string += '[Manual Focus]';
+    else if (byte2 == 0x6D) msg_string += '[Manual Iris]';
+    else if (byte2 == 0x70) msg_string += '[Stop Recording Pattern]';
+    else if (byte2 == 0x7B) msg_string += '[Aux 1 Off]';
+    else if (byte2 == 0x7C) msg_string += '[Aux 2 Off]';
+    else if (byte2 == 0x7D) msg_string += '[Aux 3 Off]';
+    else if (byte2 == 0x42 && has_byte3) msg_string += '[Goto Preset ' + byte3 + ']';
+    else if (byte2 == 0x47 && has_byte3) msg_string += '[Store Preset ' + byte3 + ']';
+    else if (byte2 == 0x43 && has_byte3) msg_string += '[Down ' + byte3 + ']';
+    else if (byte2 == 0x4C && has_byte3) msg_string += '[Left ' + byte3 + ']';
+    else if (byte2 == 0x52 && has_byte3) msg_string += '[Right ' + byte3 + ']';
+    else if (byte2 == 0x55 && has_byte3) msg_string += '[Right ' + byte3 + ']';
+    else if (byte2 == 0x5E && has_byte3) msg_string += '[Start Tour/Pattern ' + byte3 + ']';
+    else {
+        // invalid command (byte2 not in our list)
+        // do nothing. We wait for a 0x80..0xFF value to arrive
+        return;
+    }
+
+    this.emit("log",this.bytes_to_string(this.vcl_command_buffer,this.vcl_command_length) + ' ' + msg_string);
+
+    this.vcl_command_index = 0; // reset the buffer
+};
 
 
 // Returns the length of a command (as this protocol uses variable length messages)
