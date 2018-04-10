@@ -1077,6 +1077,7 @@ decode_vcl(new_byte) {
     else if (byte2 == 0x4C && has_byte3) msg_string += '[Left ' + byte3 + ']';
     else if (byte2 == 0x52 && has_byte3) msg_string += '[Right ' + byte3 + ']';
     else if (byte2 == 0x55 && has_byte3) msg_string += '[Right ' + byte3 + ']';
+    else if (byte2 == 0x50 && has_byte3) msg_string += '[Start Recording Pattern ' + byte3 + ']';
     else if (byte2 == 0x5E && has_byte3) msg_string += '[Start Tour/Pattern ' + byte3 + ']';
     else {
         // invalid command (byte2 not in our list)
