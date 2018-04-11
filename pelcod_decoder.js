@@ -1016,10 +1016,10 @@ ad_message_length(command,byte3) { // ,byte4,byte5) {
 decode_vcl(new_byte) {
 
     // VLC has no checksum or end byte so accumulate bytes until there is a command
-    // Bytes 0x80..0xFF start a command and are the camera number
-    // Bytes 0x00 to 0x7F are commands or additional data (eg speed)
+    // Bytes between 0x80 and 0xFF start a command and are the camera number
+    // Bytes between 0x00 and 0x7F are commands or additional data (eg speed)
 
-    // Add the byte to the Vicon buffer
+    // Add the byte to the VCL buffer
 
     if (new_byte >= 0x80 && new_byte <= 0xFF) {
         // This marks the start of a VCL command reset buffer counter
@@ -1053,7 +1053,8 @@ decode_vcl(new_byte) {
         byte3 = this.vcl_command_buffer[2];
     }
 
-    if (byte2 == 0x2D) msg_string += '[Stop]';
+    if      (byte2 == 0x2B) msg_string += '[Stop-(Zoom Stop?)]';
+    else if (byte2 == 0x2D) msg_string += '[Stop-(Focus Stop?)]';
     else if (byte2 == 0x3A) msg_string += '[Zoom In]';
     else if (byte2 == 0x3B) msg_string += '[Zoom Out]';
     else if (byte2 == 0x3C) msg_string += '[Focus Near]';
@@ -1068,16 +1069,18 @@ decode_vcl(new_byte) {
     else if (byte2 == 0x61) msg_string += '[Manual Focus]';
     else if (byte2 == 0x6D) msg_string += '[Manual Iris]';
     else if (byte2 == 0x70) msg_string += '[Stop Recording Pattern]';
+    else if (byte2 == 0x72) msg_string += '[Stop-(Pan Stop?)]';
+    else if (byte2 == 0x75) msg_string += '[Stop-(Tilt Stop?)]';
     else if (byte2 == 0x7B) msg_string += '[Aux 1 Off]';
     else if (byte2 == 0x7C) msg_string += '[Aux 2 Off]';
     else if (byte2 == 0x7D) msg_string += '[Aux 3 Off]';
     else if (byte2 == 0x42 && has_byte3) msg_string += '[Goto Preset ' + byte3 + ']';
     else if (byte2 == 0x47 && has_byte3) msg_string += '[Store Preset ' + byte3 + ']';
-    else if (byte2 == 0x43 && has_byte3) msg_string += '[Down ' + byte3 + ']';
+    else if (byte2 == 0x4E && has_byte3) msg_string += '[Down ' + byte3 + ']';
     else if (byte2 == 0x4C && has_byte3) msg_string += '[Left ' + byte3 + ']';
-    else if (byte2 == 0x52 && has_byte3) msg_string += '[Right ' + byte3 + ']';
-    else if (byte2 == 0x55 && has_byte3) msg_string += '[Right ' + byte3 + ']';
     else if (byte2 == 0x50 && has_byte3) msg_string += '[Start Recording Pattern ' + byte3 + ']';
+    else if (byte2 == 0x52 && has_byte3) msg_string += '[Right ' + byte3 + ']';
+    else if (byte2 == 0x55 && has_byte3) msg_string += '[Up ' + byte3 + ']';
     else if (byte2 == 0x5E && has_byte3) msg_string += '[Start Tour/Pattern ' + byte3 + ']';
     else {
         // invalid command (byte2 not in our list)
