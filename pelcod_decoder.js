@@ -1053,8 +1053,12 @@ decode_vcl(new_byte) {
         byte3 = this.vcl_command_buffer[2];
     }
 
-    if      (byte2 == 0x2B) msg_string += '[Stop-(Zoom Stop?)]';
-    else if (byte2 == 0x2D) msg_string += '[Stop-(Focus Stop?)]';
+    if      (byte2 == 0x2A) msg_string += '[Zoom In Stop]';
+    else if (byte2 == 0x2B) msg_string += '[Zoom Out Stop]';
+    else if (byte2 == 0x2C) msg_string += '[Focus Near Stop]';
+    else if (byte2 == 0x2D) msg_string += '[Focus Far Stop]';
+    else if (byte2 == 0x2E) msg_string += '[Iris Open Stop]';
+    else if (byte2 == 0x2F) msg_string += '[Iris Close Stop]';
     else if (byte2 == 0x3A) msg_string += '[Zoom In]';
     else if (byte2 == 0x3B) msg_string += '[Zoom Out]';
     else if (byte2 == 0x3C) msg_string += '[Focus Near]';
@@ -1067,24 +1071,27 @@ decode_vcl(new_byte) {
     else if (byte2 == 0x5C) msg_string += '[Aux 2 On]';
     else if (byte2 == 0x5D) msg_string += '[Aux 3 On]';
     else if (byte2 == 0x61) msg_string += '[Manual Focus]';
+    else if (byte2 == 0x6C) msg_string += '[Pan Stop 2 (6c)]';
     else if (byte2 == 0x6D) msg_string += '[Manual Iris]';
+    else if (byte2 == 0x6E) msg_string += '[Tilt Stop 2 (6e)]';
     else if (byte2 == 0x70) msg_string += '[Stop Recording Pattern]';
-    else if (byte2 == 0x72) msg_string += '[Stop-(Pan Stop?)]';
-    else if (byte2 == 0x75) msg_string += '[Stop-(Tilt Stop?)]';
+    else if (byte2 == 0x72) msg_string += '[Pan Stop 1]';
+    else if (byte2 == 0x75) msg_string += '[Tilt Stop 1]';
     else if (byte2 == 0x7B) msg_string += '[Aux 1 Off]';
     else if (byte2 == 0x7C) msg_string += '[Aux 2 Off]';
     else if (byte2 == 0x7D) msg_string += '[Aux 3 Off]';
     else if (byte2 == 0x42 && has_byte3) msg_string += '[Goto Preset ' + byte3 + ']';
     else if (byte2 == 0x47 && has_byte3) msg_string += '[Store Preset ' + byte3 + ']';
-    else if (byte2 == 0x4E && has_byte3) msg_string += '[Down ' + byte3 + ']';
-    else if (byte2 == 0x4C && has_byte3) msg_string += '[Left ' + byte3 + ']';
+    else if (byte2 == 0x4E && has_byte3) msg_string += '[Tilt Down ' + byte3 + ']';
+    else if (byte2 == 0x4C && has_byte3) msg_string += '[Pan Left ' + byte3 + ']';
     else if (byte2 == 0x50 && has_byte3) msg_string += '[Start Recording Pattern ' + byte3 + ']';
-    else if (byte2 == 0x52 && has_byte3) msg_string += '[Right ' + byte3 + ']';
-    else if (byte2 == 0x55 && has_byte3) msg_string += '[Up ' + byte3 + ']';
+    else if (byte2 == 0x52 && has_byte3) msg_string += '[Pan Right ' + byte3 + ']';
+    else if (byte2 == 0x55 && has_byte3) msg_string += '[Tilt Up ' + byte3 + ']';
     else if (byte2 == 0x5E && has_byte3) msg_string += '[Start Tour/Pattern ' + byte3 + ']';
     else {
         // invalid command (byte2 not in our list)
         // do nothing. We wait for a 0x80..0xFF value to arrive
+        // TESTING.. this.emit("log",'unknown command 0x' + byte2.toString(16));
         return;
     }
 
