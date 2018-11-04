@@ -102,6 +102,7 @@ The following flags customise the usage
 Pelco D telemery is always 7 bytes long and always starts with 0xFF and ends with a checksum. On a Pelco KBD300A Pelco D runs at 2400 baud 8-N-1 with 4800 and 9600 also common on other installations.
 
 Pelco P telemetry is always 8 bytes long and starts with 0xA0 and ends with 0xAF and a checksum. On a Pelco KBD300A Pelco P runs at 4800 baud 8-N-1 with 2400 and 9600 also common on other installations.
+The Pelco CM9760-KBD outputs Pelco P in Direct Mode with Even parity.
 
 Bosch (Philips) is always 9600 baud 8-N-1
 
