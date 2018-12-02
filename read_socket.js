@@ -1,6 +1,6 @@
 /*
  * Read and decode CCTV PTZ commands from a TCP Socket
- * Copyright 2017 Roger Hardiman
+ * Copyright 2017,2018 Roger Hardiman
  *
  * use -p to set the port to listen on
  */
@@ -114,19 +114,19 @@ server.listen(port,'127.0.0.1');
 
 
 
-// Callback - Dedoded protocol
+// Callback - Decoded protocol
 pelco_d_decoder.on('log', function(message) {
 
     var now = dateTime.create();
     var nowString = now.format('H:M:S.N');
-    var msg = nowString + '=>' + message + '\r\n';
+    var msg = nowString + '=>' + message;
 
     // show on console
     console.log(msg);
 
     // Write to file
     if (log_fd) {
-      fs.write(log_fd,msg,function(err) {
+      fs.write(log_fd,msg+'\r\n',function(err) {
         if (err) console.log('Error writing to file');
       });
     }
@@ -138,14 +138,14 @@ try{
 
     var now = dateTime.create();
     var nowString = now.format('H:M:S.N');
-    var msg = nowString + '=>' + message + '\r\n';
+    var msg = nowString + '=>' + message;
 
     // show on console
     console.log(msg);
 
     // Write to file
     if (log_fd) {
-      fs.write(log_fd,msg,function(err) {
+      fs.write(log_fd,msg+'\r\n',function(err) {
         if (err) console.log('Error writing to file');
       });
     }

@@ -1,6 +1,6 @@
 /*
  * Read and decode CCTV PTZ commands from a Serial Port / COM Port (using node-serialport)
- * Copyright 2016 Roger Hardiman
+ * (c) Copyright 2016 to 2018 Roger Hardiman
  *
  * Note that the Serial Port varies between operating systems
  * E.g.   COM1 on Windows
@@ -45,6 +45,12 @@ console.log('Pelco D, Pelco P, BBV, Bosch, Philips, Forward Vision, Vicon, Panas
 console.log('(c) Roger Hardiman 2016 www.rjh.org.uk');
 console.log('Use -h for help');
 console.log('');
+
+// Show help if there are no commands
+if (!process.argv.slice(2).length) {
+  args.outputHelp();
+  // let it fall through to show the serial ports
+}
 
 // List available serial ports
 if (args.list || (!args.port)) {
@@ -131,19 +137,19 @@ port.on('open', function(err) {
     }
 });
 
-// Callback - Data
+// Callback - Raw Data received from Serial Port
 port.on('data', function(buffer) {
 
     var now = dateTime.create();
     var nowString = now.format('H:M:S.N');
-    var msg = nowString + 'Rx' + BufferToHexString(buffer) + '\r\n';
+    var msg = nowString + 'Rx' + BufferToHexString(buffer);
 
     // write to console
     if (args.verbose) console.log(msg);
 
     // write to log file if 'fd' is not undefined
     if (log_fd) {
-      fs.write(log_fd,msg,function(err) {
+      fs.write(log_fd,msg+'\r\n',function(err) {
         if (err) console.log('Error writing to file');
       });
     }
@@ -159,19 +165,19 @@ port.on('disconnect', function(err) {
     process.exit(1);
 });
 
-// Callback - Dedoded protocol
+// Callback - Decoded protocol
 pelco_d_decoder.on('log', function(message) {
 
     var now = dateTime.create();
     var nowString = now.format('H:M:S.N');
-    var msg = nowString + '=>' + message + '\r\n';
+    var msg = nowString + '=>' + message;
 
     // show on console
     console.log(msg);
 
     // Write to file
     if (log_fd) {
-      fs.write(log_fd,msg,function(err) {
+      fs.write(log_fd,msg+'\r\n',function(err) {
         if (err) console.log('Error writing to file');
       });
     }
@@ -183,14 +189,14 @@ try{
 
     var now = dateTime.create();
     var nowString = now.format('H:M:S.N');
-    var msg = nowString + '=>' + message + '\r\n';
+    var msg = nowString + '=>' + message;
 
     // show on console
     console.log(msg);
 
     // Write to file
     if (log_fd) {
-      fs.write(log_fd,msg,function(err) {
+      fs.write(log_fd,msg+'\r\n',function(err) {
         if (err) console.log('Error writing to file');
       });
     }
