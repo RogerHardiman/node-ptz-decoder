@@ -1,5 +1,5 @@
 /*
- * Read and decode Pelco D, Pelco P, BBV422, Bosch/Philips, Forward Vision, Vicon, American Dynamics/Sensormatic and VCL CCTV PTZ commands
+ * Read and decode Pelco D, Pelco P, BBV422, Bosch/Philips, Forward Vision, Vicon, American Dynamics/Sensormatic, VCL and JVC CCTV PTZ commands
  * This code is not designed to decode every command.
  * The purpose is to monitor the output from various CCTV systems to confirm the protocols and camera addresses in use.
  * The meanings of certain Aux signals and special Preset values is not shown
@@ -72,6 +72,12 @@ class PelcoD_Decoder extends EventEmitter {
 
     // Number of bytes in the current Buffer
     this.visca_command_index = 0;
+
+    // A Buffer used for JVC (variable length message)
+    this.jvc_command_buffer = new Buffer(128);
+
+    // Number of bytes in the current Buffer
+    this.jvc_command_index = 0;
 }
 
 // Get the ascii value of a character. Even 'A' is a String in javascript so cannot
@@ -331,13 +337,37 @@ processBuffer(new_data_buffer) {
         }
 
         // Check for valid command
-        if ((this.visca_command_index >= 3) // at least 3 bytesisca_command_buffer[0] & 0x80 // MSBit set to 1
+        if ((this.visca_command_index >= 3) // at least 3 bytes
            &&(this.visca_command_buffer[0] & 0x80) // first byte has MSB set to 1
            &&(this.visca_command_buffer[this.visca_command_index - 1] == 0xFF) // last byte is 0xFF
         ){
             // Looks like a VISCA command. Process it
             this.decode_visca(this.visca_command_buffer,this.visca_command_index);
             this.visca_command_index = 0;
+        }
+
+        // Collect JVC data
+        // Starts with 0xB1
+        // Either 6 or 7 bytes. Length is in 4th byte, lower nibble
+        if (new_byte == 0xB1) {
+            // This marks the start of a the command so reset buffer counter
+            this.jvc_command_buffer[0] = new_byte;
+            this.jvc_command_index = 1;
+        } else if (this.jvc_command_index < this.jvc_command_buffer.length) {
+            // Add the new_byte to the end of the command_buffer
+            this.jvc_command_buffer[this.jvc_command_index] = new_byte;
+            this.jvc_command_index++;
+        }
+
+        // Check for valid command
+        if (((this.jvc_command_index == 6)    // 6 bytes commands have 0x82 in 4th byte
+           &&((this.jvc_command_buffer[3] & 0x0F) == 2)) // 4th byte, 0x82
+           ||((this.jvc_command_index == 7)   // 7 byte commands have 0x83 in 4th byte
+           &&((this.jvc_command_buffer[3] & 0x0F) == 3)) // 4th byte, 0x83
+        ){
+            // Looks like a JVC command. Process it
+            this.decode_jvc(this.jvc_command_buffer,this.jvc_command_index);
+            this.jvc_command_index = 0;
         }
 
 
@@ -1515,6 +1545,57 @@ decode_visca(buffer,length) {
 
     return;
 };
+
+decode_jvc(buffer,length) {
+
+    var msg_string = "";
+
+    msg_string += "JVC ";
+
+    if (buffer[0] != 0xB1) return;   // Looks like Header could be 0xB101 
+    if (length < 6) return;
+
+    var camera_id = buffer[2]; // If cameras is C177, (0xb1) it will be confused with Header Byte
+    msg_string += 'Camera ' + camera_id + ' ';
+
+    var command_length = 4 + (buffer[3]&0x0F); // 4th byte tells you the number of bytes to follow
+
+    var cmd_1 = buffer[4];
+    var cmd_2 = buffer[5];
+
+    if      (cmd_1 == 0x42 && cmd_2 == 0x00) msg_string += '[GOTO PRESET ' + buffer[6] + ']';
+    else if (cmd_1 == 0x42 && cmd_2 == 0x39) msg_string += '[Unknown - Preset Related Command ' + buffer[6] + ']';
+    else if (cmd_1 == 0x42 && cmd_2 == 0x11 && buffer[6]==0x01) msg_string += '[AUTO IRIS ON]';
+    else if (cmd_1 == 0x42 && cmd_2 == 0x11 && buffer[6]==0x00) msg_string += '[AUTO IRIS OFF?]';
+    else if (cmd_1 == 0x42 && cmd_2 == 0x15 && buffer[6]==0x01) msg_string += '[BACKLIGHT COMPENSATION ON]';
+    else if (cmd_1 == 0x42 && cmd_2 == 0x15 && buffer[6]==0x00) msg_string += '[BACKLIGHT COMPENSATION OFF]';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x28) msg_string += '[STORE PRESET ' + buffer[6] + ']';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x00) msg_string += '[PAN   RIGHT ' + buffer[6] + ']';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x01) msg_string += '[PAN   LEFT  ' + buffer[6] + ']';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x02) msg_string += '[PAN   STOP]';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x03) msg_string += '[TILT  UP   ' + buffer[6] + ']';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x04) msg_string += '[TILT  DOWN ' + buffer[6] + ']';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x05) msg_string += '[TILT  STOP]';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x06) msg_string += '[IRIS  OPEN]';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x07) msg_string += '[IRIS  CLOSE]';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x08) msg_string += '[IRIS  STOP]';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x09) msg_string += '[FOCUS FAR  ' + buffer[6] + ']';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x0A) msg_string += '[FOCUS NEAR ' + buffer[6] + ']';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x0B) msg_string += '[FOCUS STOP]';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x0C) msg_string += '[ZOOM  IN  ' + buffer[6] + ']';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x0D) msg_string += '[ZOOM  OUT ' + buffer[6] + ']';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x0E) msg_string += '[ZOOM  STOP]';
+    else if (cmd_1 == 0x45 && cmd_2 == 0x1F) msg_string += '[FOCUS AUTO]';
+    else msg_string += "[Unknown JVC command]";
+
+    var padding = '';
+    if (command_length == 6) padding = '    '; // '[..]' // add padding to 6 byte commands so length is same as 7 byte commands in the Hex dump
+
+    this.emit("log",this.bytes_to_string(buffer,length) + padding + ' ' + msg_string);
+
+    return;
+};
+
 
 bytes_to_string(buffer, length) {
     var byte_string = '';
