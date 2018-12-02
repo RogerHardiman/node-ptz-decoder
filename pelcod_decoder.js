@@ -495,10 +495,16 @@ decode(pelco_command_buffer) {
             // 2012 spec says 0 = Automatic Operation. 1 = Auto Iris Off
             // 1999 spec says range 0..2  Automatic,On,Off
             msg_string += '[AUTO IRIS SETTING ' + data_2 + ']';
+        } else if (command_2 === 0x31 && command_1 === 0x00 && data_1 === 0x00 && data_2 == 0x00) {
+	    // 2012 spec says Prior to Spectra IV, data_2 is 1=OFF, 2=ON
+            // 2012 spec says but Spectra IV the data_2 is 0=OFF, NON-ZERO=ON
+            msg_string += '[BACKLIGHT COMPENSATION ' + data_2 + '] SPECTRA IV MODE = OFF';
         } else if (command_2 === 0x31 && command_1 === 0x00 && data_1 === 0x00 && data_2 == 0x01) {
-            msg_string += '[BACKLIGHT COMPENSATION OFF]';
+            msg_string += '[BACKLIGHT COMPENSATION ' + data_2 + '] GENERIC MODE = ON / SPECTRA IV MODE = ON';
         } else if (command_2 === 0x31 && command_1 === 0x00 && data_1 === 0x00 && data_2 == 0x02) {
-            msg_string += '[BACKLIGHT COMPENSATION ON]';
+            msg_string += '[BACKLIGHT COMPENSATION ' + data_2 + '] GENERIC MODE = OFF / SPECTRA IV MODE = ON';
+        } else if (command_2 === 0x31 && command_1 === 0x00 && data_1 === 0x00 && data_2 >= 0x02) {
+            msg_string += '[BACKLIGHT COMPENSATION ' + data_2 + '] SPECTRA IV MODE = ON';
         } else {
             msg_string += 'Unknown extended command 0x' + this.DecToHexPad(command_2, 2);
         }
