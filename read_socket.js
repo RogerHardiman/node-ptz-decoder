@@ -23,7 +23,8 @@ var args = require('commander');
 args.version(version);
 args.description('Pelco D, Pelco P, BBV422, Philips/Bosch, Vicon, Forward Vision, Pansonic and American Dynamics/Sensormatic parser');
 args.option('-v, --verbose','Verbose mode. Show all data bytes');
-args.option('-p, --port <number>','TCP Port to listen');
+args.option('-r, --remote <hostname>','Hostname of Remote TCP Serial Server (raw TCP stream)');
+args.option('-p, --port <number>','TCP Port to listen on (or Port at Remote Site)');
 args.option('--nolog','Do not write to the log file. Default is to write logs');
 args.parse(process.argv);
 
@@ -74,9 +75,13 @@ if (args.nolog) {
 
 
 // Open Port.
-var server = new net.createServer(function(sock) {
+if (args.remote) {
+  // CONNECT TO REMOTE SITE
+    var sock = new net.Socket();
+  console.log('Connecting to '+ args.remote + ':' + args.port);
+    sock.connect(args.port, args.remote, function() {
 
-  console.log('Network Connection from ' + sock.remoteAddress + ':' + sock.remotePort + ' received');
+  console.log('Connected to remote site');
 
   // Callback - Data
   sock.on('data', function(buffer) {
@@ -110,7 +115,49 @@ var server = new net.createServer(function(sock) {
     console.log('Network error ' + err);
   });
 });
-server.listen(port,'127.0.0.1');
+
+} else {
+    // LISTEN FOR INCOMING CONNECTIONS
+
+    // Open Port.
+    var server = new net.createServer(function(sock) {
+
+      console.log('Network Connection from ' + sock.remoteAddress + ':' + sock.remotePort + ' received');
+
+      // Callback - Data
+      sock.on('data', function(buffer) {
+
+        var now = dateTime.create();
+        var nowString = now.format('H:M:S.N');
+        var msg = nowString + 'Rx' + BufferToHexString(buffer) + '\r\n';
+
+        // write to console
+        if (args.verbose) console.log(msg);
+
+        // write to log file if 'fd' is not undefined
+        if (log_fd) {
+          fs.write(log_fd,msg,function(err) {
+            if (err) console.log('Error writing to file');
+          });
+        }
+
+        // pass to each decoder
+        if (pelco_d_decoder) pelco_d_decoder.processBuffer(buffer);
+        if (extra_decoder_1) extra_decoder_1.processBuffer(buffer);
+      });
+
+      // Callback - Close
+      sock.on('close', function(data) {
+        console.log('Network close from ' + sock.remoteAddress + ':' + sock.remotePort + ' received');
+      });
+
+      // Callback - Error
+      sock.on('error', function(err) {
+        console.log('Network error ' + err);
+      });
+    });
+    server.listen(port,'127.0.0.1');
+}
 
 
 
