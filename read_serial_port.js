@@ -114,7 +114,7 @@ if (args.nolog) {
 
 // Open Serial Port.
 var port = new SerialPort(serial_port, {
-    baudrate: baud_rate,
+    baudRate: baud_rate,
     parity: parity,
     dataBits: data_bits,
     stopBits: stop_bits,
