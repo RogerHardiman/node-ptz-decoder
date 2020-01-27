@@ -133,7 +133,7 @@ port.on('open', function(err) {
     if (err) {
         console.log('Serial Port Error : ' + err);
     } else {
-        console.log('Serial Port ' + serial_port + ' open ' + baud_rate + '-' + parity + '-' + stop_bits);
+        console.log('Serial Port ' + serial_port + ' open ' + baud_rate + '-' + data_bits + '-' + parity + '-' + stop_bits);
     }
 });
 
