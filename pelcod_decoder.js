@@ -1,10 +1,10 @@
 /*
- * Read and decode Pelco D, Pelco P, BBV422, Bosch/Philips, Forward Vision, Vicon, American Dynamics/Sensormatic, VCL and JVC CCTV PTZ commands
+ * Read and decode Pelco D, Pelco P, BBV422, Bosch/Philips, Forward Vision, Vicon, American Dynamics/Sensormatic, VCL, 	JVC and HikVision CCTV PTZ commands
  * This code is not designed to decode every command.
  * The purpose is to monitor the output from various CCTV systems to confirm the protocols and camera addresses in use.
  * The meanings of certain Aux signals and special Preset values is not shown
  * 
- * (c) Copyright 2016-2018 Roger Hardiman
+ * (c) Copyright 2016-2020 Roger Hardiman
  *
  * Processes NodeJS Buffer() data.
  * Buffer() objects may have multiple PTZ messages or just part of a message so bytes are cached if needed.
@@ -78,6 +78,13 @@ class PelcoD_Decoder extends EventEmitter {
 
     // Number of bytes in the current Buffer
     this.jvc_command_index = 0;
+
+    // A Buffer used to cache partial commands
+    this.hik_command_buffer = new Buffer(8);
+
+    // Number of bytes in the current Buffer
+    this.hik_command_index = 0;
+
 }
 
 // Get the ascii value of a character. Even 'A' is a String in javascript so cannot
@@ -240,7 +247,7 @@ processBuffer(new_data_buffer) {
         if (this.pelco_command_index === 7 && this.pelco_command_buffer[0] === 0xFF
                                            && this.checksum_valid(this.pelco_command_buffer)) {
             // Looks like we have a Pelco command. Try and process it
-            this.decode(this.pelco_command_buffer);
+            this.decode_pelco(this.pelco_command_buffer);
             this.pelco_command_index = 0; // empty the buffer
         }
 
@@ -249,7 +256,7 @@ processBuffer(new_data_buffer) {
                                              && this.pelco_p_command_buffer[6] === 0xAF
                                              && this.checksum_p_valid(this.pelco_p_command_buffer)) {
             // Looks like we have a Pelco command. Try and process it
-            this.decode(this.pelco_p_command_buffer);
+            this.decode_pelco(this.pelco_p_command_buffer);
             this.pelco_p_command_index = 0; // empty the buffer
         }
 
@@ -259,7 +266,7 @@ processBuffer(new_data_buffer) {
                                              && this.pelco_p_command_buffer[6] === 0xBF
                                              && this.checksum_p_valid(this.pelco_p_command_buffer)) {
             // Looks like we have a Pelco command. Try and process it
-            this.decode(this.pelco_p_command_buffer);
+            this.decode_pelco(this.pelco_p_command_buffer);
             this.pelco_p_command_index = 0; // empty the buffer
         }
 
@@ -370,7 +377,31 @@ processBuffer(new_data_buffer) {
             this.jvc_command_index = 0;
         }
 
+        // Collect HikVision data
+        // Starts with 0xB5
+        // 0xB5 could be part of the payload (eg a high numbered preset)
+        // So we keep a cache of the last 8 bytes
+        if (this.hik_command_index < this.hik_command_buffer.length) {
+            // Add the new_byte to the end of the buffer
+            this.hik_command_buffer[this.hik_command_index] = new_byte;
+            this.hik_command_index++;
+        } else {
+            // Shift the bytes to make room for the new_byte at the end
+            for (var x = 0; x < (this.hik_command_buffer.length - 1); x++) {
+                this.hik_command_buffer[x] = this.hik_command_buffer[x + 1];
+            }
+            // Then add the new_byte to the end
+            this.hik_command_buffer[this.hik_command_buffer.length-1] = new_byte;
+        }
 
+        // Check for valid command
+        // We require 8 bytes with byte 0 = 0xB5 and with a valid checksum
+        if (this.hik_command_index === 8 && this.hik_command_buffer[0] === 0xB5
+                                           && this.checksum_hik_valid(this.hik_command_buffer,8)) {
+            // Looks like we have a HikVision command. Try and process it
+            this.decode_hik(this.hik_command_buffer,8);
+            this.hik_command_index = 0; // empty the buffer
+        }
     }
 };
 
@@ -445,9 +476,23 @@ checksum_ad_valid(buffer,message_length) {
     }
 };
 
+checksum_hik_valid(buffer,message_length) {
+    // Sum mod 256 including header byte
+    var total = 0;
+    for (var x = 0; x < (message_length - 1); x++) {
+        total += buffer[x];
+    }
+    var computed_checksum = total % 256;
+    // Check if computed_checksum matches the last byte in the buffer
+    if (computed_checksum === buffer[message_length - 1]) {
+        return true;
+    } else {
+        return false;
+    }
+};
 
 
-decode(pelco_command_buffer) {
+decode_pelco(pelco_command_buffer) {
 
     var pelco_d = false;
     var pelco_p = false;
@@ -1595,6 +1640,68 @@ decode_jvc(buffer,length) {
 
     return;
 };
+
+decode_hik(buffer,length) {
+
+    var msg_string ='';
+
+    //var sync = buffer[0];
+    var camera_id = buffer[1];
+    var command = buffer[2];
+    var data_1 = buffer[3];
+    var data_2 = buffer[4];
+    var data_3 = buffer[5];
+    var data_4 = buffer[6];
+    //var checksum  = buffer[7];
+
+    msg_string += 'HIK ';
+
+    msg_string += 'Camera ' + camera_id + ' ';
+    
+
+    if      (command === 0x06) {
+        msg_string += '[UP]';
+    } else if (command === 0x07) {
+        msg_string += '[DOWN]';
+    } else if (command === 0x08) {
+        msg_string += '[RIGHT]';
+    } else if (command === 0x09) {
+        msg_string += '[LEFT]';
+    } else if (command === 0x0a) {
+        msg_string += '[UP-LEFT]';
+    } else if (command === 0x0b) {
+        msg_string += '[DOWN-LEFT]';
+    } else if (command === 0x0c) {
+        msg_string += '[UP-RIGHT]';
+    } else if (command === 0x0d) {
+        msg_string += '[DOWN-RIGHT]';
+    } else if (command === 0x0e) {
+        msg_string += '[IRIS -]';
+    } else if (command === 0x0f) {
+        msg_string += '[IRIS +]';
+    } else if (command === 0x10) {
+        msg_string += '[ZOOM +]';
+    } else if (command === 0x11) {
+        msg_string += '[ZOOM -]';
+    } else if (command === 0x12) {
+        msg_string += '[FOCUS -]';
+    } else if (command === 0x13) {
+        msg_string += '[FOCUS +]';
+    } else if (command === 0x14) {
+        msg_string += '[PTZ STOP]';
+    } else if (command === 0x15) {
+        msg_string += '[SET PRESET ' + data_1 + ']';
+    } else if (command === 0x17) {
+        msg_string += '[GOTO PRESET ' + data_1 + ']';
+    } else {
+        msg_string += '[UNKNOWN COMMAND ' + command + ']';
+    }
+
+    this.emit("log",this.bytes_to_string(buffer,length) + ' ' + msg_string);
+
+    return;
+};
+
 
 
 bytes_to_string(buffer, length) {
