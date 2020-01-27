@@ -1693,6 +1693,16 @@ decode_hik(buffer,length) {
         msg_string += '[SET PRESET ' + data_1 + ']';
     } else if (command === 0x17) {
         msg_string += '[GOTO PRESET ' + data_1 + ']';
+    } else if (command === 0x1b) {
+        msg_string += '[PATROL PATH - START OF DATA';
+    } else if (command === 0x1c) {
+        msg_string += '[PATROL PATH - END OF DATA]';
+    } else if (command === 0x1d) {
+        msg_string += '[PATROL PATH ' + data_1 + ' INDEX ' + data_2 + ' GOTO PRESET ' + data_3 + ']';
+    } else if (command === 0x1e) {
+        msg_string += '[PATROL PATH ' + data_1 + ' INDEX ' + data_2 + ' DWELL ' + data_3 + 'secs]';
+    } else if (command === 0x1f) {
+        msg_string += '[PATROL PATH ' + data_1 + ' INDEX ' + data_2 + ' SPEED ' + data_3 + ']';
     } else {
         msg_string += '[UNKNOWN COMMAND ' + command + ']';
     }
