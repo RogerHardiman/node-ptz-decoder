@@ -1659,7 +1659,9 @@ decode_hik(buffer,length) {
     msg_string += 'Camera ' + camera_id + ' ';
     
 
-    if      (command === 0x06) {
+    if      (command === 0x00) {
+        msg_string += '[STOP RUNNING PATTERN]';
+    } else if (command === 0x06) {
         msg_string += '[UP   ' + data_1 + ']';
     } else if (command === 0x07) {
         msg_string += '[DOWN ' + data_1 + ']';
@@ -1680,23 +1682,33 @@ decode_hik(buffer,length) {
     } else if (command === 0x0f) {
         msg_string += '[IRIS +]';
     } else if (command === 0x10) {
-        msg_string += '[ZOOM +]';
-    } else if (command === 0x11) {
-        msg_string += '[ZOOM -]';
-    } else if (command === 0x12) {
-        msg_string += '[FOCUS -]';
-    } else if (command === 0x13) {
         msg_string += '[FOCUS +]';
+    } else if (command === 0x11) {
+        msg_string += '[FOCUS -]';
+    } else if (command === 0x12) {
+        msg_string += '[ZOOM -]';
+    } else if (command === 0x13) {
+        msg_string += '[ZOOM +]';
     } else if (command === 0x14) {
         msg_string += '[PTZ STOP]';
     } else if (command === 0x15) {
         msg_string += '[SET PRESET ' + data_1 + ']';
+    } else if (command === 0x17 && data_1 >= 35) {
+        msg_string += '[GOT PRESET ' + data_1 + '/START PATROL ' + (data_1-34) + ']';
     } else if (command === 0x17) {
         msg_string += '[GOTO PRESET ' + data_1 + ']';
+    } else if (command === 0x18) {
+        msg_string += '[START RECORDING PATTERN]';
+    } else if (command === 0x19) {
+        msg_string += '[STOP RECORDING PATTERN]';
+    } else if (command === 0x1a) {
+        msg_string += '[START RUNNING PATTERN]';
     } else if (command === 0x1b) {
         msg_string += '[PATROL PATH - START OF DATA';
     } else if (command === 0x1c) {
         msg_string += '[PATROL PATH - END OF DATA]';
+    } else if (command === 0x1d && data_3 === 0) {
+        msg_string += '[PATROL PATH ' + data_1 + ' INDEX ' + data_2 + ' ERASE]';
     } else if (command === 0x1d) {
         msg_string += '[PATROL PATH ' + data_1 + ' INDEX ' + data_2 + ' GOTO PRESET ' + data_3 + ']';
     } else if (command === 0x1e) {
