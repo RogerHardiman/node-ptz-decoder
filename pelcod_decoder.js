@@ -1660,21 +1660,21 @@ decode_hik(buffer,length) {
     
 
     if      (command === 0x06) {
-        msg_string += '[UP]';
+        msg_string += '[UP   ' + data_1 + ']';
     } else if (command === 0x07) {
-        msg_string += '[DOWN]';
+        msg_string += '[DOWN ' + data_1 + ']';
     } else if (command === 0x08) {
-        msg_string += '[RIGHT]';
+        msg_string += '[RIGHT ' + data_2 + ']';
     } else if (command === 0x09) {
-        msg_string += '[LEFT]';
+        msg_string += '[LEFT  ' + data_2 + ']';
     } else if (command === 0x0a) {
-        msg_string += '[UP-LEFT]';
+        msg_string += '[UP-LEFT ' + data_1 + ' ' + data_2 + ']';
     } else if (command === 0x0b) {
-        msg_string += '[DOWN-LEFT]';
+        msg_string += '[DOWN-LEFT ' + data_1 + ' ' + data_2 + ']';
     } else if (command === 0x0c) {
-        msg_string += '[UP-RIGHT]';
+        msg_string += '[UP-RIGHT ' + data_1 + ' ' + data_2 + ']';
     } else if (command === 0x0d) {
-        msg_string += '[DOWN-RIGHT]';
+        msg_string += '[DOWN-RIGHT ' + data_1 + ' ' + data_2 + ']';
     } else if (command === 0x0e) {
         msg_string += '[IRIS -]';
     } else if (command === 0x0f) {
