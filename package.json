@@ -1,6 +1,6 @@
 {
   "name": "pelcod-decoder",
-  "version": "2.5.1",
+  "version": "3.0.0",
   "description": "CCTV PTZ Telemetry Decoder for Pelco D, Pelco P, BBV422, Bosch/Philips, Forward Vision, Vicon, Panasonic and AD/Sensormatic protocols",
   "license": "MIT",
   "author": {
