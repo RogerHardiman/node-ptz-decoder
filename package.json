@@ -12,14 +12,14 @@
     "url": "https://github.com/rogerhardiman/node-pelcod-decoder.git"
   },
   "dependencies": {
-    "node-datetime": "^1.0.0",
-    "serialport": "^6.2.2",
+    "node-datetime": "^2.1.2",
+    "serialport": "^9.0.3",
     "commander": "^2.9.0"
   },
   "devDependencies": {
-    "chai": "^3.5.0",
+    "chai": "^4.2.0",
     "istanbul": "^0.4.3",
-    "mocha": "^5.2.0"
+    "mocha": "^8.2.1"
   },
   "scripts": {
     "test": "./node_modules/.bin/mocha --reporter spec",
@@ -28,6 +28,8 @@
   "keywords": [
     "CCTV",
     "Pelco",
+    "Pelco D",
+    "Pelco P",
     "Bosch",
     "Philips",
     "Forward Vision",
