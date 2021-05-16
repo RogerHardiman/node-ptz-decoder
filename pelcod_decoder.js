@@ -85,6 +85,10 @@ class PelcoD_Decoder extends EventEmitter {
             // Get the next new byte
             var new_byte = new_data_buffer[i];
 
+            this.send_byte_to_ad(new_byte);
+            //this.send_byte_to_vcl_decoder(new_byte);
+
+
             // Add to the end of the Pelco D buffer
             // We cannot simply look for 0xFF as this could be
             // part of the payload as well as the header
@@ -148,45 +152,6 @@ class PelcoD_Decoder extends EventEmitter {
                 // Add the new_byte to the end of the vicon_command_buffer
                 this.vicon_command_buffer[this.vicon_command_index] = new_byte;
                 this.vicon_command_index++;
-            }
-
-
-            // VCL. First byte is 0x80 to 0xFF and is the camera number.
-            // Rest of the command is either 2 bytes or 3 bytes
-            // Byte 2 and Byte 3 are 0x00 to 0x7F
-            // There is no 'End Byte' so need to process each byte as it arrives
-            {
-                this.decode_vcl(new_byte);
-            }
-
-
-            // Add to American Dynamics byte buffer accumulating bytes
-            // AD422 is minimum of 3 bytes.
-            // It starts with an address (1..99 [0x01..0x63] where 64[0x40] is for broadcast) followed by a command (0x81 to 0xFA)
-            // and then either the Checksum OR a variable length payload and Checksum
-            // Ensure first 2 bytes meet the range criteria
-            if (this.ad_command_index == 0 && new_byte >= 0x01 && new_byte <= 0x63) {
-                // Add the new_byte to the end of the ad_command_buffer
-                this.ad_command_buffer[this.ad_command_index] = new_byte;
-                this.ad_command_index++;
-            }
-            else if (this.ad_command_index == 1 && new_byte >= 0x81 && new_byte <= 0xFA) {
-                // Add the new_byte to the end of the ad_command_buffer
-                this.ad_command_buffer[this.ad_command_index] = new_byte;
-                this.ad_command_index++;
-            }
-            else if (this.ad_command_index == 2) {
-                // Add the new_byte to the end of the ad_command_buffer
-                this.ad_command_buffer[this.ad_command_index] = new_byte;
-                this.ad_command_index++;
-            }
-            else if (this.ad_command_index > 2 && this.ad_command_index < this.ad_message_length(this.ad_command_buffer[1], this.ad_command_buffer[2])) {
-                // Add the new_byte to the end of the ad_command_buffer
-                this.ad_command_buffer[this.ad_command_index] = new_byte;
-                this.ad_command_index++;
-            } else {
-                // We have not met the critera. Reset the buffer
-                this.ad_command_index = 0;
             }
 
             // Add to Panasonic byte buffer accumulating bytes
@@ -282,21 +247,6 @@ class PelcoD_Decoder extends EventEmitter {
             }
 
 
-            // American Dynamics AD422 / Sensormatic
-            // First Byte = Address 0x01 to 0x63
-            // Second Byte = Command 0x81 to 0xFA
-            // Third Byte = Checksum OR a Payload and Checksum
-            // Then a variable length payload (zero, 1, 2 or more bytes)
-            // This code does not handle the 0xDE SET TEXT command as the payload size is in the 5th byte
-            if ((this.ad_command_buffer[0] >= 0x01 && this.ad_command_buffer[0] <= 0x63)
-                && (this.ad_command_buffer[1] >= 0x81 && this.ad_command_buffer[1] <= 0xFA)
-                && (this.ad_command_index == this.ad_message_length(this.ad_command_buffer[1], this.ad_command_buffer[2]))
-                && (this.checksum_ad_valid(this.ad_command_buffer, this.ad_command_index))) {
-                // Looks like we have an American Dynamics AD422 / Sensormatic command. Try and process it
-                this.decode_ad422(this.ad_command_buffer);
-                this.ad_command_index = 0; // empty the buffer
-            }
-
             // Panasonic is STX (0x02) then payload and then ETX (0x03)
             // The Payload is at least 11 bytes eg GC7:9034002 so the shortest message is 13 bytes
             if ((this.panasonic_command_buffer[0] == 0x02)
@@ -380,7 +330,7 @@ class PelcoD_Decoder extends EventEmitter {
                 this.hik_command_index = 0; // empty the buffer
             }
         }
-    };
+    }
 
     checksum_valid(buffer) {
         var total = 0;
@@ -395,7 +345,7 @@ class PelcoD_Decoder extends EventEmitter {
         } else {
             return false;
         }
-    };
+    }
 
     checksum_p_valid(buffer) {
         var computed_checksum = 0x00;
@@ -408,7 +358,7 @@ class PelcoD_Decoder extends EventEmitter {
         } else {
             return false;
         }
-    };
+    }
 
     checksum_bosch_valid(buffer, message_length) {
         var total = 0;
@@ -422,7 +372,7 @@ class PelcoD_Decoder extends EventEmitter {
         } else {
             return false;
         }
-    };
+    }
 
     checksum_fv_valid(buffer, message_length) {
         var computed_checksum = 0x00;
@@ -436,22 +386,9 @@ class PelcoD_Decoder extends EventEmitter {
         } else {
             return false;
         }
-    };
+    }
 
 
-    checksum_ad_valid(buffer, message_length) {
-        var total = 0;
-        for (var x = 0; x < (message_length - 1); x++) {
-            total += buffer[x];
-        }
-        var computed_checksum = (0 - total) & 0xFF;
-        // Check if computed_checksum matches the last byte in the buffer
-        if (computed_checksum === buffer[message_length - 1]) {
-            return true;
-        } else {
-            return false;
-        }
-    };
 
     checksum_hik_valid(buffer, message_length) {
         // Sum mod 256 including header byte
@@ -466,7 +403,7 @@ class PelcoD_Decoder extends EventEmitter {
         } else {
             return false;
         }
-    };
+    }
 
 
     decode_pelco(pelco_command_buffer) {
@@ -640,7 +577,7 @@ class PelcoD_Decoder extends EventEmitter {
 
         }
         this.emit("log", this.bytes_to_string(pelco_command_buffer, pelco_command_buffer.length) + ' ' + msg_string);
-    };
+    }
 
     decode_bosch(bosch_command_buffer) {
 
@@ -806,7 +743,7 @@ class PelcoD_Decoder extends EventEmitter {
         }
 
         this.emit("log", this.bytes_to_string(bosch_command_buffer, length + 1) + ' ' + msg_string);
-    };
+    }
 
     fv_hex_ascii(byte_1, byte_2) {
         // Byte 1 could be 0x31  = ASCII "1"
@@ -954,7 +891,7 @@ class PelcoD_Decoder extends EventEmitter {
 
 
         this.emit("log", this.bytes_to_string(fv_command_buffer, fv_command_length) + ' ' + msg_string);
-    };
+    }
 
 
     decode_vicon(vicon_command_buffer, vicon_command_length) {
@@ -1048,30 +985,20 @@ class PelcoD_Decoder extends EventEmitter {
         }
 
         this.emit("log", this.bytes_to_string(vicon_command_buffer, vicon_command_length) + ' ' + msg_string);
-    };
+    }
 
 
 
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // VLC
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    send_byte_to_vcl_decoder(new_byte) {
 
-    // Returns the length of a command (as this protocol uses variable length messages)
-    ad_message_length(command, byte3) { // ,byte4,byte5) {
-        if (command == 0xA6) return 13; // Goto Abs Position
-        if (command == 0xC0) return 5; // Proportional Speed
-        if (command == 0xC4) return 6; // Get Config
-        if (command == 0xC7) return 5; // Set and Goto Preset
-        if (command == 0xCC) return 4; // Various config commands
-        if (command == 0xCD) return 5; // QuickSet
-        if (command == 0xDE) return 0; // Variable Length ASCII message. 5th Byte tells us ASCII string length
-        // Check for 0xFA 'get' command has bit 7 clear. Goes not use command length bits
-        if (command == 0xFA && (byte3 >> 7 == 0)) return 4 + 1; // Variable Length Network Position Command. 4 bytes plus checsksum
-        // Check for 0xFA 'set' command has bit 7 set. Obey command length bits
-        if (command == 0xFA && (byte3 >> 7 == 1)) return (byte3 & 0x1F) + 1; // Variable Length Network Position Command plus checsksum
-        return 3;  // all other commands are 3 bytes long (address, command, checksum)
-    };
-
-
-    decode_vcl(new_byte) {
+        // VCL. First byte is 0x80 to 0xFF and is the camera number.
+        // Rest of the command is either 2 bytes or 3 bytes
+        // Byte 2 and Byte 3 are 0x00 to 0x7F
+        // There is no 'End Byte' so need to process each byte as it arrives
 
         // VLC has no checksum or end byte so accumulate bytes until there is a command
         // Bytes between 0x80 and 0xFF start a command and are the camera number
@@ -1156,7 +1083,60 @@ class PelcoD_Decoder extends EventEmitter {
         this.emit("log", this.bytes_to_string(this.vcl_command_buffer, this.vcl_command_length) + ' ' + msg_string);
 
         this.vcl_command_index = 0; // reset the buffer
-    };
+    }
+
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // American Dynamics / Sensormatic
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    send_byte_to_ad(new_byte) {
+        // Add to American Dynamics byte buffer accumulating bytes
+        // AD422 is minimum of 3 bytes.
+        // It starts with an address (1..99 [0x01..0x63] where 64[0x40] is for broadcast) followed by a command (0x81 to 0xFA)
+        // and then either the Checksum OR a variable length payload and Checksum
+        // Ensure first 2 bytes meet the range criteria
+        if (this.ad_command_index == 0 && new_byte >= 0x01 && new_byte <= 0x63) {
+            // Add the new_byte to the end of the ad_command_buffer
+            this.ad_command_buffer[this.ad_command_index] = new_byte;
+            this.ad_command_index++;
+        }
+        else if (this.ad_command_index == 1 && new_byte >= 0x81 && new_byte <= 0xFA) {
+            // Add the new_byte to the end of the ad_command_buffer
+            this.ad_command_buffer[this.ad_command_index] = new_byte;
+            this.ad_command_index++;
+        }
+        else if (this.ad_command_index == 2) {
+            // Add the new_byte to the end of the ad_command_buffer
+            this.ad_command_buffer[this.ad_command_index] = new_byte;
+            this.ad_command_index++;
+        }
+        else if (this.ad_command_index > 2 && this.ad_command_index < this.ad_message_length(this.ad_command_buffer[1], this.ad_command_buffer[2])) {
+            // Add the new_byte to the end of the ad_command_buffer
+            this.ad_command_buffer[this.ad_command_index] = new_byte;
+            this.ad_command_index++;
+        } else {
+            // We have not met the critera. Reset the buffer
+            this.ad_command_index = 0;
+        }
+
+
+        // American Dynamics AD422 / Sensormatic
+        // First Byte = Address 0x01 to 0x63
+        // Second Byte = Command 0x81 to 0xFA
+        // Third Byte = Checksum OR a Payload and Checksum
+        // Then a variable length payload (zero, 1, 2 or more bytes)
+        // This code does not handle the 0xDE SET TEXT command as the payload size is in the 5th byte
+        if ((this.ad_command_buffer[0] >= 0x01 && this.ad_command_buffer[0] <= 0x63)
+            && (this.ad_command_buffer[1] >= 0x81 && this.ad_command_buffer[1] <= 0xFA)
+            && (this.ad_command_index == this.ad_message_length(this.ad_command_buffer[1], this.ad_command_buffer[2]))
+            && (this.checksum_ad_valid(this.ad_command_buffer, this.ad_command_index))) {
+            // Looks like we have an American Dynamics AD422 / Sensormatic command. Try and process it
+            this.decode_ad422(this.ad_command_buffer);
+            this.ad_command_index = 0; // empty the buffer
+        }
+    }
 
 
     // Returns the length of a command (as this protocol uses variable length messages)
@@ -1173,7 +1153,21 @@ class PelcoD_Decoder extends EventEmitter {
         // Check for 0xFA 'set' command has bit 7 set. Obey command length bits
         if (command == 0xFA && (byte3 >> 7 == 1)) return (byte3 & 0x1F) + 1; // Variable Length Network Position Command plus checsksum
         return 3;  // all other commands are 3 bytes long (address, command, checksum)
-    };
+    }
+
+    checksum_ad_valid(buffer, message_length) {
+        var total = 0;
+        for (var x = 0; x < (message_length - 1); x++) {
+            total += buffer[x];
+        }
+        var computed_checksum = (0 - total) & 0xFF;
+        // Check if computed_checksum matches the last byte in the buffer
+        if (computed_checksum === buffer[message_length - 1]) {
+            return true;
+        } else {
+            return false;
+        }
+    }
 
     decode_ad422(ad_command_buffer) {
 
@@ -1241,6 +1235,18 @@ class PelcoD_Decoder extends EventEmitter {
         else if (command_code == 0x99) {
             msg_string += 'Resume replies from camera';
         }
+        else if (command_code == 0xA0) {
+            msg_string += 'Start Recording Pattern 1';
+        }
+        else if (command_code == 0xA1) {
+            msg_string += 'Start Recording Pattern 2';
+        }
+        else if (command_code == 0xA2) {
+            msg_string += 'Start Recording Pattern 3';
+        }
+        else if (command_code == 0xA3) {
+            msg_string += 'End Recording Pattern Msg2';
+        }
         else if (command_code == 0xA5) {
             msg_string += 'Request Position';
         }
@@ -1267,6 +1273,9 @@ class PelcoD_Decoder extends EventEmitter {
         }
         else if (command_code == 0xB7) {
             msg_string += 'Goto Target 4';
+        }
+        else if (command_code == 0xB8) {
+            msg_string += 'End Recording Pattern Msg1';
         }
         else if (command_code == 0xB9) {
             msg_string += 'Store Target 5';
@@ -1299,6 +1308,9 @@ class PelcoD_Decoder extends EventEmitter {
         }
         else if (command_code == 0xCC) {
             var additional_command = ad_command_buffer[2];
+            if (additional_command == 0x03) msg_string += 'Run Pattern 1';
+            if (additional_command == 0x04) msg_string += 'Run Pattern 2';
+            if (additional_command == 0x05) msg_string += 'Run Pattern 3';
             if (additional_command == 0x08) msg_string += 'Auto Focus Auto Iris';
         }
         else if (command_code == 0xC7) {
@@ -1348,7 +1360,7 @@ class PelcoD_Decoder extends EventEmitter {
         this.emit("log", this.bytes_to_string(ad_command_buffer, length) + ' ' + msg_string);
 
         return;
-    };
+    }
 
     decode_panasonic(buffer, length) {
 
@@ -1429,7 +1441,7 @@ class PelcoD_Decoder extends EventEmitter {
 
         this.emit("log", msg_string);
         return;
-    };
+    }
 
     decode_visca(buffer, length) {
 
@@ -1502,7 +1514,7 @@ class PelcoD_Decoder extends EventEmitter {
             msg_string += 'Home';
         } else if (length == 6 && buffer[1] == 0x01 && buffer[2] == 0x06 && buffer[3] == 0x06 && buffer[4] == 0x02) {
             msg_string += 'OSD Menu on';
-        } else if (length == 6 && buffer[1] == 0x01 && buffer[2] == 0x06 && buffer[3] == 0x06 && buffer[4] == 0x02) {
+        } else if (length == 6 && buffer[1] == 0x01 && buffer[2] == 0x06 && buffer[3] == 0x06 && buffer[4] == 0x03) {
             msg_string += 'OSD Menu off';
         } else if (length == 6 && buffer[1] == 0x01 && buffer[2] == 0x04) {
             var b3 = buffer[3];
@@ -1555,7 +1567,6 @@ class PelcoD_Decoder extends EventEmitter {
             if (b3 == 0x40) msg_string += 'Auto PowerOff ' + time + ' seconds'; //D100
             else msg_string += 'Other VISCA command';
         } else if (length == 4 && buffer[1] == 0x30 && buffer[2] == 0x01) {
-        } else if (length == 4 && buffer[1] == 0x30 && buffer[2] == 0x01) {
             msg_string += 'Address Set Command';
         } else if (length == 5 && buffer[1] == 0x01 && buffer[2] == 0x00 && buffer[3] == 0x01) {
             msg_string += 'IF_Clear Command';
@@ -1566,7 +1577,7 @@ class PelcoD_Decoder extends EventEmitter {
         this.emit("log", this.bytes_to_string(buffer, length) + ' ' + msg_string);
 
         return;
-    };
+    }
 
     decode_jvc(buffer, length) {
 
@@ -1616,7 +1627,7 @@ class PelcoD_Decoder extends EventEmitter {
         this.emit("log", this.bytes_to_string(buffer, length) + padding + ' ' + msg_string);
 
         return;
-    };
+    }
 
     decode_hik(buffer, length) {
 
@@ -1699,7 +1710,7 @@ class PelcoD_Decoder extends EventEmitter {
         this.emit("log", this.bytes_to_string(buffer, length) + ' ' + msg_string);
 
         return;
-    };
+    }
 
 
 
@@ -1709,7 +1720,7 @@ class PelcoD_Decoder extends EventEmitter {
             byte_string += '[' + this.DecToHexPad(buffer[i], 2) + ']';
         }
         return byte_string;
-    };
+    }
 
     DecToHexPad(decimal, size) {
         var ret_string = decimal.toString('16');
@@ -1717,7 +1728,7 @@ class PelcoD_Decoder extends EventEmitter {
             ret_string = '0' + ret_string;
         }
         return ret_string;
-    };
+    }
 } // end class
 
 module.exports = { PelcoD_Decoder };
