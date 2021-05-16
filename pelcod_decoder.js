@@ -51,6 +51,10 @@ class PelcoD_Decoder extends EventEmitter {
         this.pelco_p_command_buffer = new Buffer(8);
         this.pelco_p_command_index = 0;
 
+        // A Buffer used to cache partial commands for Samsung
+        this.samsung_command_buffer = new Buffer(9);
+        this.samsung_command_index = 0;
+
         // A Buffer used for VCL (variable length message)
         this.vcl_command_buffer = new Buffer(128);
         this.vcl_command_index = 0;
@@ -86,6 +90,7 @@ class PelcoD_Decoder extends EventEmitter {
             var new_byte = new_data_buffer[i];
 
             this.send_byte_to_ad(new_byte);
+            this.send_byte_to_samsung(new_byte);
             //this.send_byte_to_vcl_decoder(new_byte);
 
 
@@ -1362,6 +1367,11 @@ class PelcoD_Decoder extends EventEmitter {
         return;
     }
 
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Panasonic
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     decode_panasonic(buffer, length) {
 
         var msg_string = "";
@@ -1442,6 +1452,11 @@ class PelcoD_Decoder extends EventEmitter {
         this.emit("log", msg_string);
         return;
     }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // VISCA / Sony VISCA
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     decode_visca(buffer, length) {
 
@@ -1579,6 +1594,11 @@ class PelcoD_Decoder extends EventEmitter {
         return;
     }
 
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // JVC
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     decode_jvc(buffer, length) {
 
         var msg_string = "";
@@ -1628,6 +1648,11 @@ class PelcoD_Decoder extends EventEmitter {
 
         return;
     }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // HikVision
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     decode_hik(buffer, length) {
 
@@ -1708,6 +1733,131 @@ class PelcoD_Decoder extends EventEmitter {
         }
 
         this.emit("log", this.bytes_to_string(buffer, length) + ' ' + msg_string);
+
+        return;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Samsung
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // Commands are 9 bytes. Start with 0xA0. End with a Checksum
+
+    // Cam1  Pan Left   [a0] [00] [01] [01] [00] [01] [40] [00] [bc]
+    // Cam1  Pan Right  [a0] [00] [01] [01] [00] [02] [40] [00] [bb]
+    // Cam1  Tilt Up    [a0] [00] [01] [01] [00] [04] [00] [2d] [cc]    
+    // Cam1  Tilt Down  [a0] [00] [01] [01] [00] [08] [00] [2d] [c8]
+
+    // Cam1  Zoom In    [a0] [00] [01] [01] [20] [00] [00] [00] [dd]
+    // Cam1  Zoom Out   [a0] [00] [01] [01] [40] [00] [00] [00] [bd]
+
+    // Cam1  Focus Near [a0] [00] [01] [01] [02] [00] [00] [00] [fb]
+    // Cam1  Focus Far  [a0] [00] [01] [01] [01] [00] [00] [00] [fc]
+
+    // Cam1  Iris open  [0a] [00] [01] [01] [08] [00] [00] [00] [f5]
+    // Cam1  Iris close [0a] [00] [01] [01] [10] [00] [00] [00] [ed]
+
+    // Cam1  Stop       [a0] [00] [01] [01] [00] [00] [00] [00] [fd]
+
+    // Cam10 Pan Left   [a0] [00] [0a] [01] [00] [01] [40] [00] [b3]
+    // Cam10 Stop       [a0] [00] [0a] [01] [00] [00] [00] [00] [f4]
+    send_byte_to_samsung(new_byte) {
+
+        // Add to the end of the Samsung buffer
+        // Then look for 0xA0 and a valud checksum
+        if (this.samsung_command_index < this.samsung_command_buffer.length) {
+            // Add the new_byte to the end of the samsung_command_buffer
+            this.samsung_command_buffer[this.samsung_command_index] = new_byte;
+            this.samsung_command_index++;
+        } else {
+            // Shift the bytes to make room for the new_byte at the end
+            for (var x = 0; x < (this.samsung_command_buffer.length - 1); x++) {
+                this.samsung_command_buffer[x] = this.samsung_command_buffer[x + 1];
+            }
+            // Then add the new_byte to the end
+            this.samsung_command_buffer[this.samsung_command_buffer.length - 1] = new_byte;
+        }
+
+
+        // Samsung Test. Check if we have 9 bytes with byte 0 = 0xA0 and with a valid checksum
+        if (this.samsung_command_index === 9 && this.samsung_command_buffer[0] === 0xA0
+            && this.samsung_checksum_valid(this.samsung_command_buffer, 9)) {
+            // Looks like we have a Samsung command. Try and process it
+            this.decode_samsung(this.samsung_command_buffer);
+            this.samsung_command_index = 0; // empty the buffer
+        }
+    }
+
+    samsung_checksum_valid(buffer, message_length) {
+        // Checksum does not include the 0xA0 header. Start at Index 1
+        var total = 0;
+        for (var x = 1; x < (message_length - 1); x++) {
+            total += buffer[x];
+        }
+        var computed_checksum = 255 - (total % 256);
+        // Check if computed_checksum matches the last byte in the buffer
+        if (computed_checksum === buffer[message_length - 1]) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    decode_samsung(buffer) {
+
+        var msg_string = '';
+
+        //var sync = buffer[0]; // Always 0xA0
+        var byte1 = buffer[1]; // unknown
+        var camera_id = buffer[2];
+        var byte3 = buffer[3]; // unknown
+        var command1 = buffer[4]; // Command Type
+        var command2 = buffer[5]; // Direction for PTZ
+        var byte6 = buffer[6]; // Pan Speed
+        var byte7 = buffer[7]; // Tilt Speed
+        //var checksum  = buffer[8];
+
+        msg_string += 'Samsung ';
+
+        msg_string += 'Camera ' + camera_id + ' ';
+
+
+        if (command1 === 0x00 && command2 == 0x00) {
+            msg_string += '[STOP]';
+        }
+        else if (command1 === 0x00 && command2 == 0x01) {
+            msg_string += '[LEFT  ' + byte6 + ']';
+        } else if (command1 === 0x00 && command2 == 0x02) {
+            msg_string += '[RIGHT ' + byte6 + ']';
+        } else if (command1 === 0x00 && command2 == 0x04) {
+            msg_string += '[UP    ' + byte7 + ']';
+        } else if (command1 === 0x00 && command2 == 0x05) {
+            msg_string += '[LEFT-UP ' + byte6 + ' ' + byte7 + ']';
+        } else if (command1 === 0x00 && command2 == 0x06) {
+            msg_string += '[RIGHT-UP ' + byte6 + ' ' + byte7 + ']';
+        } else if (command1 === 0x00 && command2 == 0x08) {
+            msg_string += '[DOWN  ' + byte7 + ']';
+        } else if (command1 === 0x00 && command2 == 0x09) {
+            msg_string += '[LEFT-DOWN ' + byte6 + ' ' + byte7 + ']';
+        } else if (command1 === 0x00 && command2 == 0x0A) {
+            msg_string += '[RIGHT-DOWN ' + byte6 + ' ' + byte7 + ']';
+        } else if (command1 === 0x01) {
+            msg_string += '[FOCUS FAR]';
+        } else if (command1 === 0x02) {
+            msg_string += '[FOCUS NEAR]';
+        } else if (command1 === 0x08) {
+            msg_string += '[IRIS OPEN]';
+        } else if (command1 === 0x10) {
+            msg_string += '[IRIS CLOSE]';
+        } else if (command1 === 0x20) {
+            msg_string += '[ZOOM IN]';
+        } else if (command1 === 0x40) {
+            msg_string += '[ZOOM OUT]';
+        } else {
+            msg_string += '[UNKNOWN COMMAND ' + command1 + ']';
+        }
+
+        this.emit("log", this.bytes_to_string(buffer, buffer.length) + ' ' + msg_string);
 
         return;
     }
